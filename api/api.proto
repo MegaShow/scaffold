@@ -1,0 +1,19 @@
+edition = "2024";
+
+package api;
+
+option go_package = "go.icytown.com/scaffold/internal/gen/api";
+
+import "google/protobuf/descriptor.proto";
+
+message HttpRule {
+  string get = 1;
+  string post = 2;
+  string put = 3;
+  string delete = 4;
+  string patch = 5;
+}
+
+extend google.protobuf.MethodOptions {
+  HttpRule http = 100001;
+}
