@@ -1,0 +1,103 @@
+edition = "2024";
+
+package dev;
+
+option go_package = "go.icytown.com/scaffold/example/dev";
+
+import "api/api.proto";
+
+// 开发调试请求，用于查看和调试各类型的表单解码。
+message Request {
+  Types types = 1;
+}
+
+// 开发调试响应。
+message Response {}
+
+// 覆盖所有 protobuf 基础类型，以及枚举、数组、子消息和映射。
+message Types {
+  int32 id = 1;
+
+  // 这个注释将在字段的上面
+  // 这是超级长的注释
+  bool bool_value = 2;
+  bytes bytes_value = 3; // 这个是短注释
+  double double_value = 4;
+  fixed32 fixed32_value = 5;
+  fixed64 fixed64_value = 6;
+  float float_value = 7;
+  int32 int32_value = 8;
+  int64 int64_value = 9;
+  sfixed32 sfixed32_value = 10;
+  sfixed64 sfixed64_value = 11;
+  sint32 sint32_value = 12;
+  sint64 sint64_value = 13;
+  string string_value = 14;
+  uint32 uint32_value = 15;
+  uint64 uint64_value = 16;
+  State state = 17;
+
+  // 数值数组使用同名表单键传入多个值。
+  repeated double double_values = 18;
+  repeated float float_values = 19;
+  repeated int32 int32_values = 20;
+  repeated int64 int64_values = 21;
+  repeated uint32 uint32_values = 22;
+  repeated uint64 uint64_values = 23;
+
+  // 子消息字段示例：types.child.name。
+  Child child = 24;
+  // 子消息数组示例：types.children[0].name。
+  repeated Child children = 25;
+  // 基础类型映射示例：types.labels[env]。
+  map<string, string> labels = 26;
+  // 子消息映射示例：types.children_by_name[alice].name。
+  map<string, Child> children_by_name = 27;
+  // 数值键映射示例：types.children_by_id[1].name。
+  map<int64, Child> children_by_id = 28;
+}
+
+// 全类型示例的枚举。
+enum State {
+  STATE_UNSPECIFIED = 0;
+  STATE_ACTIVE = 1;
+}
+
+// 全类型示例的子消息。
+message Child {
+  string name = 1;
+}
+
+// 开发调试服务。
+service Service {
+  // 这是一个关于接口的注释
+  rpc Test(Request) returns (Response) {
+    option (api.http) = {
+      post: "/test"
+    };
+  }
+  // 测试空请求。
+  rpc TestEmptyRequest(api.Empty) returns (Response) {
+    option (api.http) = {
+      get: "/test/empty-request"
+    };
+  }
+  // 测试空响应。
+  rpc TestEmptyResponse(Request) returns (api.Empty) {
+    option (api.http) = {
+      post: "/test/empty-response"
+    };
+  }
+  // 测试请求和响应都为空。
+  rpc TestEmpty(api.Empty) returns (api.Empty) {
+    option (api.http) = {
+      post: "/test/empty"
+    };
+  }
+  // 测试 path 参数
+  rpc TestPath(Types) returns (Response) {
+    option (api.http) = {
+      get: "/test/path/{bool_value}/{bytes_value}/{double_value}/{float_value}/{int32_value}/{int64_value}/{uint32_value}/{uint64_value}/{state}"
+    };
+  }
+}

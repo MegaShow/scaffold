@@ -33,6 +33,8 @@ go install go.icytown.com/scaffold@latest
 
 ## 使用
 
+### 声明 IDL 和生成服务代码
+
 创建一个 proto 文件。
 
 ```proto
@@ -67,4 +69,32 @@ service UserService {
 
 ```sh
 protoc-gen-scaffold -lang=go -kind=server -include=. user.proto
+```
+
+### 实现服务接口
+
+```go
+type ServiceImpl struct {}
+
+func (s *ServiceImpl) GetUser(ctx context.Context, req *gen.GetUserRequest) (*gen.GetUserResponse, error) {
+	return &gen.GetUserResponse{UserID: req.UserID, Name: "Test User"}, nil
+}
+```
+
+### 在 Web 框架中注册服务
+
+```go
+import (
+	"net/http"
+
+	"go.icytown.com/scaffold/mux"
+)
+
+func createServeMux() *http.ServeMux {
+	serveMux := http.NewServeMux()
+	parser := &mux.AdaptParser{Form: &mux.FormParser{}, JSON: &mux.JSONParser{}}
+	renderer := &mux.JSONRenderer{}
+	gen.RegisterUserService(serveMux, &ServiceImpl{}, parser, renderer)
+	return serveMux
+}
 ```

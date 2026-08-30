@@ -21,13 +21,15 @@ package {{ .Package }}
 {{ end }}
 
 {{- range .Enums }}
-  {{ renderGoComment .Comment -}}
+  {{ renderGoComment .Comment }}
   type {{ .Name }} int32
 
   const (
     {{- $enum := . }}
     {{- range .Values }}
-      {{ renderGoComment .Comment -}}
+      {{- if .Comment }}
+        {{ renderGoComment .Comment }}
+      {{- end }}
       {{ .Name }} {{ $enum.Name }} = {{ .Number }}
     {{- end }}
   )
@@ -36,14 +38,66 @@ package {{ .Package }}
 {{ range .Messages }}
   {{ renderGoComment .Comment }}
   type {{ .Name }} struct {
-  {{ range .Fields }}
-    {{- if contains .Comment "\n" }}
-      {{- renderGoComment .Comment }}
-    {{- end -}}
-    {{ .Name }} {{ renderGoType .Type .Repeated }}
-    {{- if not (contains .Comment "\n") -}}
-      {{- renderGoComment .Comment -}}
-    {{- end }}
-  {{ end -}}
+    {{ range .Fields }}
+      {{- if contains .Comment "\n" }}
+        {{- renderGoComment .Comment }}
+      {{- end -}}
+      {{ renderGoName .Name }} {{ if .Repeated }}[]{{ end }}{{ renderGoType .Type }} `json:"{{ .Name }}"`
+      {{- if not (contains .Comment "\n") -}}
+        {{- renderGoComment .Comment -}}
+      {{- end }}
+    {{ end -}}
   }
+
+  {{- if .IsUsedInRequest }}
+    // DecodeForm 把 url.Values 表单键值解析到 v。
+    func (v *{{ .Name }}) DecodeForm(values url.Values) error {
+      d := form.NewDecoder(values)
+      {{- range .Fields }}
+        {{- $fieldGoName := renderGoName .Name }}
+        {{- $method := renderGoName (printf "%s" .Type.Kind) }}
+        {{- if eq .Type.Kind "map" }}
+          {{- if eq .Type.MapElem.Kind "message" }}
+            {{- $method = "MapStruct" }}
+          {{- end }}
+        {{- else if eq .Type.Kind "message" }}
+          {{- $method = "Struct" }}
+        {{- end }}
+        {{- if .Repeated }}
+          {{- if eq .Type.Kind "bytes" }}
+            {{- $method = printf "%sList" $method }}
+          {{- else }}
+            {{- $method = printf "%ss" $method }}
+          {{- end }}
+        {{- end }}
+
+        {{- if eq .Type.Kind "map" }}
+          {{- $keyParser := printf "conv.Parse%s" (renderGoName (printf "%s" .Type.MapKey.Kind)) }}
+          {{- if eq .Type.MapElem.Kind "message" }}
+            d.{{ $method }}("{{ .Name }}", &v.{{ $fieldGoName }}, {{ $keyParser }})
+          {{- else }}
+            {{- $valueParser := printf "conv.Parse%s" (renderGoName (printf "%s" .Type.MapElem.Kind)) }}
+            {{- if eq .Type.MapElem.Kind "enum" }}
+              {{- $valueParser = printf "%s[%s]" $valueParser (renderGoType .Type.MapElem) }}
+            {{- end }}
+            d.{{ $method }}("{{ .Name }}", &v.{{ $fieldGoName }}, {{ $keyParser }}, {{ $valueParser }})
+          {{- end }}
+        {{- else }}
+          d.{{ $method }}("{{ .Name }}", &v.{{ $fieldGoName }})
+        {{- end }}
+      {{- end }}
+      return d.Err()
+    }
+  {{- end }}
+
+  {{- if .PathFields }}
+    // DecodePath 按字段声明顺序解析 names 指定的路径参数，覆盖已有值；遇到错误后停止。
+    func (v *{{ .Name }}) DecodePath(r *http.Request) error {
+      d := path.NewDecoder(r)
+      {{- range .PathFields }}
+        d.{{ renderGoName (printf "%s" .Type.Kind) }}("{{ .Name }}", &v.{{ renderGoName .Name }})
+      {{- end }}
+      return d.Err()
+    }
+  {{- end }}
 {{ end }}

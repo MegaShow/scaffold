@@ -8,19 +8,49 @@ package gen
 
 import (
 	"context"
+	"net/http"
 
 	"go.icytown.com/scaffold/mux"
 )
 
 // 用户服务
 type UserService interface {
-	// 创建用户
-	// 该接口会返回创建用户的 ID
-	CreateUser(ctx context.Context, req *CreateUserRequest) (*CreateUserResponse, error)
-	GetUser(ctx context.Context, req *GetUserRequest) (*GetUserResponse, error) // 查询用户
+	CreateUser(ctx context.Context, req *CreateUserRequest) (*CreateUserResponse, error) // 创建用户
+	GetUser(ctx context.Context, req *GetUserRequest) (*GetUserResponse, error)          // 查询用户
 }
 
-func RegisterUserService(m mux.Mux, s UserService) {
-	m.HandleFunc("POST /users", nil)
-	m.HandleFunc("GET /users/{user_id}", nil)
+func RegisterUserService(m mux.Mux, service UserService, parser mux.Parser, renderer mux.Renderer) {
+	s := wUserService{service: service, parser: parser, renderer: renderer}
+	m.HandleFunc("POST /users", s.CreateUser)
+	m.HandleFunc("GET /users/{user_id}", s.GetUser)
+}
+
+type wUserService struct {
+	service  UserService
+	parser   mux.Parser
+	renderer mux.Renderer
+}
+
+func (s *wUserService) CreateUser(w http.ResponseWriter, r *http.Request) {
+	req := new(CreateUserRequest)
+	if err := s.parser.Parse(r, req); err != nil {
+		s.renderer.Render(w, nil, mux.ErrBadRequest)
+		return
+	}
+	resp, err := s.service.CreateUser(r.Context(), req)
+	s.renderer.Render(w, resp, err)
+}
+
+func (s *wUserService) GetUser(w http.ResponseWriter, r *http.Request) {
+	req := new(GetUserRequest)
+	if err := s.parser.Parse(r, req); err != nil {
+		s.renderer.Render(w, nil, mux.ErrBadRequest)
+		return
+	}
+	if err := req.DecodePath(r); err != nil {
+		s.renderer.Render(w, nil, mux.ErrBadRequest)
+		return
+	}
+	resp, err := s.service.GetUser(r.Context(), req)
+	s.renderer.Render(w, resp, err)
 }

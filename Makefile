@@ -45,6 +45,14 @@ gen-api: $(BIN)/protoc $(BIN)/protoc-gen-go
 # 生成 example 演示代码
 gen-example: build $(BIN)/protoc
 	@echo "Generate example source code"
+	@mkdir -p ./example/dev
+	@go run ./cmd/protoc-gen-scaffold -protoc=$(BIN)/protoc \
+		-lang=go -kind=server \
+		-out=./example/dev \
+		-include=. \
+		-include=./example/dev \
+		test.proto
+	@mkdir -p ./example/go-server/gen
 	@go run ./cmd/protoc-gen-scaffold -protoc=$(BIN)/protoc \
 		-lang=go -kind=server \
 		-out=./example/go-server/gen \

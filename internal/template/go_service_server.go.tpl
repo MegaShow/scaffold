@@ -21,22 +21,57 @@ package {{ .Package }}
 {{ end }}
 
 {{ range .Services }}
+  {{ $wrapperName := printf "w%s" .Name }}
+
   {{ renderGoComment .Comment }}
   type {{ .Name }} interface {
     {{ range .Methods }}
       {{- if contains .Comment "\n" }}
         {{- renderGoComment .Comment }}
       {{- end -}}
-      {{ .Name }}(ctx context.Context, req {{ renderGoType .RequestType false }}) ({{ renderGoType .ResponseType false }}, error)
+      {{ .Name }}(ctx context.Context{{ if not (isEmptyType .RequestType) }}, req {{ renderGoType .RequestType }}{{ end }})
+        {{- " " }}{{ if isEmptyType .ResponseType }}error{{ else }}({{ renderGoType .ResponseType }}, error){{ end }}
       {{- if not (contains .Comment "\n") -}}
         {{- renderGoComment .Comment -}}
       {{- end }}
     {{ end -}}
   }
 
-  func Register{{ .Name }}(m mux.Mux, s {{ .Name }}) {
+  func Register{{ .Name }}(m mux.Mux, service {{ .Name }}, parser mux.Parser, renderer mux.Renderer) {
+    s := {{ $wrapperName }}{service: service, parser: parser, renderer: renderer}
     {{ range .Methods -}}
-      m.HandleFunc("{{ .HTTPMethod }} {{ .Pattern }}", nil)
+      m.HandleFunc("{{ .HTTPMethod }} {{ .Pattern }}", s.{{ .Name }})
     {{ end -}}
   }
+
+  type {{ $wrapperName }} struct {
+    service  {{ .Name }}
+    parser   mux.Parser
+    renderer mux.Renderer
+  }
+
+  {{ range .Methods }}
+    func (s *{{ $wrapperName }}) {{ .Name }}(w http.ResponseWriter, r *http.Request) {
+      {{- if not (isEmptyType .RequestType) }}
+        req := new({{ renderGoNamedType .RequestType }})
+        if err := s.parser.Parse(r, req); err != nil {
+          s.renderer.Render(w, nil, mux.ErrBadRequest)
+          return
+        }
+        {{- if .PathParams }}
+          if err := req.DecodePath(r); err != nil {
+            s.renderer.Render(w, nil, mux.ErrBadRequest)
+            return
+          }
+        {{- end }}
+      {{- end }}
+      {{- if isEmptyType .ResponseType }}
+        err := s.service.{{ .Name }}(r.Context(){{ if not (isEmptyType .RequestType) }}, req{{ end }})
+        s.renderer.Render(w, nil, err)
+      {{- else }}
+        resp, err := s.service.{{ .Name }}(r.Context(){{ if not (isEmptyType .RequestType) }}, req{{ end }})
+        s.renderer.Render(w, resp, err)
+      {{- end }}
+    }
+  {{ end }}
 {{ end }}

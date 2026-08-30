@@ -6,27 +6,57 @@
 
 package gen
 
+import (
+	"net/http"
+	"net/url"
+
+	"go.icytown.com/scaffold/mux/form"
+	"go.icytown.com/scaffold/mux/path"
+)
+
 // 创建用户请求
 type CreateUserRequest struct {
-	Email string // 用户邮箱，登录凭证
-	Name  string // 用户昵称
+	Email string `json:"email"` // 用户邮箱，登录凭证
+	Name  string `json:"name"`  // 用户昵称
+}
+
+// DecodeForm 把 url.Values 表单键值解析到 v。
+func (v *CreateUserRequest) DecodeForm(values url.Values) error {
+	d := form.NewDecoder(values)
+	d.String("email", &v.Email)
+	d.String("name", &v.Name)
+	return d.Err()
 }
 
 // 创建用户响应
 type CreateUserResponse struct {
-	// 用户 ID
-	// 这是创建用户成功后对应用户的 ID 标识
-	UserId int32
-	Name   string // 用户昵称
+	UserID int32  `json:"user_id"` // 用户 ID
+	Name   string `json:"name"`    // 用户昵称
 }
 
 // 查询用户请求
 type GetUserRequest struct {
-	UserId int32 // 用户 ID
+	UserID int32 `json:"user_id"` // 用户 ID
+	TS     int64 `json:"ts"`      // 没意义的时间戳
+}
+
+// DecodeForm 把 url.Values 表单键值解析到 v。
+func (v *GetUserRequest) DecodeForm(values url.Values) error {
+	d := form.NewDecoder(values)
+	d.Int32("user_id", &v.UserID)
+	d.Int64("ts", &v.TS)
+	return d.Err()
+}
+
+// DecodePath 按字段声明顺序解析 names 指定的路径参数，覆盖已有值；遇到错误后停止。
+func (v *GetUserRequest) DecodePath(r *http.Request) error {
+	d := path.NewDecoder(r)
+	d.Int32("user_id", &v.UserID)
+	return d.Err()
 }
 
 // 查询用户响应
 type GetUserResponse struct {
-	UserId int32  // 用户 ID
-	Name   string // 用户昵称
+	UserID int32  `json:"user_id"` // 用户 ID
+	Name   string `json:"name"`    // 用户昵称
 }

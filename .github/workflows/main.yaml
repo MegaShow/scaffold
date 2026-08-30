@@ -18,3 +18,22 @@ jobs:
           go-version: "1.27.x"
       - name: Setup Golang CI Lint
         uses: golangci/golangci-lint-action@v9
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: ["1.27.x"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Setup Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: ${{ matrix.go-version }}
+      - name: Test
+        run: go test ./... -race -coverprofile=coverage.out
+      - name: Codecov
+        uses: codecov/codecov-action@v7
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

@@ -136,10 +136,10 @@ func toEnum(e *protogen.Enum) *generator.Enum {
 	return &generator.Enum{Name: e.GoIdent.GoName, Comment: commentOf(e.Comments), Values: values}
 }
 
-// toField 把 protobuf 字段描述转换为中间模型的字段。
+// toField 把 protobuf 字段描述转换为中间模型的字段，字段名保留 IDL 中的原始名字。
 func toField(field *protogen.Field, file *protogen.File) *generator.Field {
 	return &generator.Field{
-		Name:     field.GoName,
+		Name:     string(field.Desc.Name()),
 		Comment:  commentOf(field.Comments),
 		Type:     toFieldType(field, file),
 		Repeated: field.Desc.IsList(),

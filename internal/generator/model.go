@@ -54,7 +54,7 @@ type Message struct {
 
 // Field 描述消息的一个字段。
 type Field struct {
-	Name     string // 字段名
+	Name     string // 字段名，保留 IDL 中的原始名字，如 user_id
 	Comment  string // 注释
 	Type     *Type  // 字段类型
 	Repeated bool   // 是否为列表
