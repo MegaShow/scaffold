@@ -16,8 +16,20 @@ jobs:
         uses: actions/setup-go@v7
         with:
           go-version: "1.27.x"
-      - name: Setup Golang CI Lint
+      - name: Lint Scaffold
         uses: golangci/golangci-lint-action@v9
+      - name: Lint Mux
+        uses: golangci/golangci-lint-action@v9
+        with:
+          working-directory: mux
+
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Check Assert Consistency
+        run: diff -ru internal/assert mux/internal/assert
 
   test:
     runs-on: ubuntu-latest
@@ -31,9 +43,14 @@ jobs:
         uses: actions/setup-go@v7
         with:
           go-version: ${{ matrix.go-version }}
-      - name: Test
-        run: go test ./... -race -coverprofile=coverage.out
+      - name: Test Scaffold
+        run: go test ./... -race -coverprofile=coverage-scaffold.out
+      - name: Test Mux
+        run: go test ./... -race -coverprofile=coverage-mux.out
       - name: Codecov
         uses: codecov/codecov-action@v7
+        with:
+          fail_ci_if_error: true
+          files: ./coverage-scaffold.out,./coverage-mux.out
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

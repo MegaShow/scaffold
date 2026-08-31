@@ -62,6 +62,26 @@ gen-example: build $(BIN)/protoc
 	@echo "Generate example source code success"
 
 
+# 检查 assert 目录一致性并 lint 主模块和 mux 模块
+lint:
+	@echo "Checking assert consistency"
+	@diff -ru internal/assert mux/internal/assert
+	@echo "Linting scaffold"
+	@golangci-lint run ./...
+	@echo "Linting mux"
+	@cd mux && golangci-lint run ./...
+	@echo "Lint success"
+
+
+# 测试主模块和 mux 模块
+test:
+	@echo "Testing scaffold"
+	@go test -race ./...
+	@echo "Testing mux"
+	@cd mux && go test -race ./...
+	@echo "Test success"
+
+
 # 安装 protoc
 $(BIN)/protoc: Makefile
 	@if [ "$(PROTOC_ZIP)" = "" ]; then \
