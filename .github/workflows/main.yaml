@@ -35,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go-version: ["1.27.x"]
+        go-version: ["stable"]
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -46,9 +46,11 @@ jobs:
       - name: Test Scaffold
         run: go test ./... -race -coverprofile=coverage-scaffold.out
       - name: Test Mux
-        run: go test ./... -race -coverprofile=coverage-mux.out
+        run: go test ./... -race -coverprofile=../coverage-mux.out
+        working-directory: mux
       - name: Codecov
         uses: codecov/codecov-action@v7
+        if: ${{ matrix.go-version }} == 'stable'
         with:
           fail_ci_if_error: true
           files: ./coverage-scaffold.out,./coverage-mux.out
