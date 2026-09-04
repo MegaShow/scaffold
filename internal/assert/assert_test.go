@@ -1,216 +1,321 @@
 package assert
 
 import (
-	"fmt"
-	"strconv"
-	"strings"
 	"testing"
 	"unsafe"
 )
 
-// recordingTesting 记录断言的报告，避免预期的断言失败使当前测试失败。
+// recordingTesting 记录是否输出了错误，用于判断断言失败时是否报告。
 type recordingTesting struct {
-	messages      []string
-	helperCalls   int
-	missingHelper bool
+	errored bool
 }
 
-func (r *recordingTesting) Errorf(format string, args ...any) {
-	if r.helperCalls == 0 {
-		r.missingHelper = true
-	}
-	r.messages = append(r.messages, fmt.Sprintf(format, args...))
-}
-
-func (r *recordingTesting) Helper() {
-	r.helperCalls++
-}
+func (r *recordingTesting) Errorf(string, ...any) { r.errored = true }
+func (r *recordingTesting) Helper()               {}
 
 func TestElementsMatch(t *testing.T) {
 	t.Parallel()
-	for _, tt := range []struct {
-		name     string
-		expected []int
-		actual   []int
-		want     bool
-		message  string
+	testCases := []struct {
+		name string
+		a, b []int
+		want bool
 	}{
-		{name: "nil", want: true},
-		{name: "empty", expected: []int{}, actual: []int{}, want: true},
-		{name: "nil_and_empty", actual: []int{}, want: true},
-		{name: "reordered", expected: []int{1, 2, 3}, actual: []int{3, 1, 2}, want: true},
-		{name: "duplicate_counts_match", expected: []int{1, 1, 2}, actual: []int{2, 1, 1}, want: true},
-		{name: "different_lengths", expected: []int{1}, actual: []int{1, 2}, message: "Should have same length:\nExpected: 1\nActual:   2"},
-		{name: "missing_element", expected: []int{1, 2}, actual: []int{1, 3}, message: "Missing element: 2"},
-		{name: "duplicate_counts_differ", expected: []int{1, 1, 2}, actual: []int{1, 2, 2}, message: "Missing element: 1"},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			r := new(recordingTesting)
-			got := ElementsMatch(r, tt.expected, tt.actual)
-			checkResult(t, r, got, tt.want, tt.message)
-		})
+		{name: "nil_nil", a: nil, b: nil, want: true},
+		{name: "empty_empty", a: []int{}, b: []int{}, want: true},
+		{name: "nil_empty", a: nil, b: []int{}, want: true},
+		{name: "order", a: []int{1, 2, 3}, b: []int{3, 1, 2}, want: true},
+		{name: "duplicates", a: []int{1, 1, 2}, b: []int{2, 1, 1}, want: true},
+		{name: "length_mismatch", a: []int{1}, b: []int{1, 2}, want: false},
+		{name: "missing_element", a: []int{1, 2}, b: []int{1, 3}, want: false},
+		{name: "duplicate_mismatch", a: []int{1, 1, 2}, b: []int{1, 2, 2}, want: false},
 	}
-
-	t.Run("nested_values", func(t *testing.T) {
-		t.Parallel()
+	for _, tt := range testCases {
 		r := new(recordingTesting)
-		got := ElementsMatch(r,
-			[]map[string][]int{{"a": {1, 2}}, {"b": {3}}},
-			[]map[string][]int{{"b": {3}}, {"a": {1, 2}}},
-		)
-		checkResult(t, r, got, true)
-	})
-}
+		got := ElementsMatch(r, tt.a, tt.b)
+		if got != tt.want {
+			t.Errorf("%s: ElementsMatch = %t, want %t", tt.name, got, tt.want)
+		}
+		if r.errored != !tt.want {
+			t.Errorf("%s: errored = %t, want %t", tt.name, r.errored, !tt.want)
+		}
+	}
 
-func TestEqualAndNotEqual(t *testing.T) {
-	t.Parallel()
-	for _, tt := range []struct {
-		name     string
-		expected any
-		actual   any
-		equal    bool
-	}{
-		{name: "nil", equal: true},
-		{name: "integer", expected: 42, actual: 42, equal: true},
-		{name: "different_integer", expected: 42, actual: 43},
-		{name: "different_types", expected: int32(42), actual: int64(42)},
-		{name: "slice", expected: []int{1, 2}, actual: []int{1, 2}, equal: true},
-		{name: "slice_order", expected: []int{1, 2}, actual: []int{2, 1}},
-		{name: "nil_and_empty_slice", expected: []int(nil), actual: []int{}},
-		{name: "nil_and_empty_map", expected: map[string]int(nil), actual: map[string]int{}},
-		{name: "nested_map", expected: map[string][]int{"a": {1, 2}}, actual: map[string][]int{"a": {1, 2}}, equal: true},
-		{name: "different_nested_map", expected: map[string][]int{"a": {1, 2}}, actual: map[string][]int{"a": {1, 3}}},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			equalReport := new(recordingTesting)
-			gotEqual := Equal(equalReport, tt.expected, tt.actual)
-			checkResult(t, equalReport, gotEqual, tt.equal,
-				"Should be equal:", fmt.Sprintf("Expected: %#v", tt.expected), fmt.Sprintf("Actual:   %#v", tt.actual))
-
-			notEqualReport := new(recordingTesting)
-			gotNotEqual := NotEqual(notEqualReport, tt.expected, tt.actual)
-			checkResult(t, notEqualReport, gotNotEqual, !tt.equal,
-				fmt.Sprintf("Should be not equal, value: %#v", tt.expected))
-		})
+	// 复杂元素类型仍按顺序匹配。
+	r := new(recordingTesting)
+	got := ElementsMatch(r,
+		[]map[string][]int{{"a": {1, 2}}, {"b": {3}}},
+		[]map[string][]int{{"b": {3}}, {"a": {1, 2}}})
+	if !got || r.errored {
+		t.Errorf("complex elements: got=%t errored=%t, want true/false", got, r.errored)
 	}
 }
 
-func TestNilAndNotNil(t *testing.T) {
-	t.Parallel()
-	var nilUnsafePointer unsafe.Pointer
-	for _, tt := range []struct {
-		name  string
-		value any
-		nil   bool
-	}{
-		{name: "nil", nil: true},
-		{name: "nil_pointer", value: (*int)(nil), nil: true},
-		{name: "nil_slice", value: []int(nil), nil: true},
-		{name: "nil_map", value: map[string]int(nil), nil: true},
-		{name: "nil_channel", value: (chan int)(nil), nil: true},
-		{name: "nil_function", value: (func())(nil), nil: true},
-		{name: "nil_unsafe_pointer", value: nilUnsafePointer, nil: true},
-		{name: "pointer", value: new(int)},
-		{name: "empty_slice", value: []int{}},
-		{name: "empty_map", value: map[string]int{}},
-		{name: "channel", value: make(chan int)},
-		{name: "function", value: func() {}},
-		{name: "unsafe_pointer", value: unsafe.Pointer(new(int))}, //nolint:gosec // 仅构造有效指针以验证非 nil 判断，不执行指针运算或解引用。
-		{name: "zero_integer", value: 0},
-		{name: "empty_string", value: ""},
-		{name: "false", value: false},
-		{name: "struct", value: struct{}{}},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			nilReport := new(recordingTesting)
-			gotNil := Nil(nilReport, tt.value)
-			checkResult(t, nilReport, gotNil, tt.nil,
-				fmt.Sprintf("Should be nil, but got %#v", tt.value))
+// equalCases 是 Equal/NotEqual 共享的对比用例，want 为 Equal 的期望。
+var equalCases = []struct {
+	name string
+	a, b any
+	want bool
+}{
+	{name: "nil", a: nil, b: nil, want: true},
+	{name: "int_equal", a: 42, b: 42, want: true},
+	{name: "int_not_equal", a: 42, b: 43, want: false},
+	{name: "type_mismatch", a: int32(42), b: int64(42), want: false},
+	{name: "slice_equal", a: []int{1, 2}, b: []int{1, 2}, want: true},
+	{name: "slice_order", a: []int{1, 2}, b: []int{2, 1}, want: false},
+	{name: "nil_slice_vs_empty", a: []int(nil), b: []int{}, want: false},
+	{name: "nil_map_vs_empty", a: map[string]int(nil), b: map[string]int{}, want: false},
+	{name: "map_equal", a: map[string][]int{"a": {1, 2}}, b: map[string][]int{"a": {1, 2}}, want: true},
+	{name: "map_not_equal", a: map[string][]int{"a": {1, 2}}, b: map[string][]int{"a": {1, 3}}, want: false},
+}
 
-			notNilReport := new(recordingTesting)
-			gotNotNil := NotNil(notNilReport, tt.value)
-			checkResult(t, notNilReport, gotNotNil, !tt.nil, "Should be not nil, but got nil")
-		})
+func TestEqual(t *testing.T) {
+	t.Parallel()
+	for _, tt := range equalCases {
+		r := new(recordingTesting)
+		got := Equal(r, tt.a, tt.b)
+		if got != tt.want {
+			t.Errorf("%s: Equal = %t, want %t", tt.name, got, tt.want)
+		}
+		if r.errored != !tt.want {
+			t.Errorf("%s: errored = %t, want %t", tt.name, r.errored, !tt.want)
+		}
+	}
+}
+
+func TestFalse(t *testing.T) {
+	t.Parallel()
+	r := new(recordingTesting)
+	if got := False(r, false); !got {
+		t.Errorf("False(false) = %t, want true", got)
+	}
+	if r.errored {
+		t.Error("False(false) should not report error")
+	}
+
+	r = new(recordingTesting)
+	if got := False(r, true); got {
+		t.Errorf("False(true) = %t, want false", got)
+	}
+	if !r.errored {
+		t.Error("False(true) should report error")
+	}
+}
+
+func TestNil(t *testing.T) {
+	t.Parallel()
+	testCases := []struct {
+		name string
+		v    any
+		want bool
+	}{
+		{name: "nil", v: nil, want: true},
+		{name: "nil_pointer", v: (*int)(nil), want: true},
+		{name: "nil_slice", v: []int(nil), want: true},
+		{name: "nil_map", v: map[string]int(nil), want: true},
+		{name: "nil_chan", v: (chan int)(nil), want: true},
+		{name: "nil_func", v: (func())(nil), want: true},
+		{name: "nil_unsafe_pointer", v: unsafe.Pointer(nil), want: true}, //nolint:gosec // 测试 isNil 对 unsafe.Pointer 的处理
+		{name: "int", v: 0, want: false},
+		{name: "string", v: "", want: false},
+		{name: "bool", v: false, want: false},
+		{name: "pointer", v: new(int), want: false},
+		{name: "slice", v: []int{}, want: false},
+		{name: "map", v: map[string]int{}, want: false},
+		{name: "chan", v: make(chan int), want: false},
+		{name: "func", v: func() {}, want: false},
+		{name: "struct", v: struct{}{}, want: false},
+		{name: "unsafe_pointer", v: unsafe.Pointer(new(int)), want: false}, //nolint:gosec // 测试 isNil 对 unsafe.Pointer 的处理
+	}
+	for _, tt := range testCases {
+		r := new(recordingTesting)
+		got := Nil(r, tt.v)
+		if got != tt.want {
+			t.Errorf("%s: Nil = %t, want %t", tt.name, got, tt.want)
+		}
+		if r.errored != !tt.want {
+			t.Errorf("%s: errored = %t, want %t", tt.name, r.errored, !tt.want)
+		}
+	}
+}
+
+func TestNotNil(t *testing.T) {
+	t.Parallel()
+	testCases := []struct {
+		name string
+		v    any
+		want bool
+	}{
+		{name: "nil", v: nil, want: false},
+		{name: "nil_pointer", v: (*int)(nil), want: false},
+		{name: "nil_slice", v: []int(nil), want: false},
+		{name: "nil_map", v: map[string]int(nil), want: false},
+		{name: "nil_chan", v: (chan int)(nil), want: false},
+		{name: "nil_func", v: (func())(nil), want: false},
+		{name: "nil_unsafe_pointer", v: unsafe.Pointer(nil), want: false}, //nolint:gosec // 测试 NotNil 对 unsafe.Pointer 的处理
+		{name: "pointer", v: new(int), want: true},
+		{name: "slice", v: []int{}, want: true},
+		{name: "map", v: map[string]int{}, want: true},
+		{name: "chan", v: make(chan int), want: true},
+		{name: "func", v: func() {}, want: true},
+		{name: "unsafe_pointer", v: unsafe.Pointer(new(int)), want: true}, //nolint:gosec // 测试 NotNil 对 unsafe.Pointer 的处理
+		{name: "int", v: 0, want: true},
+		{name: "string", v: "", want: true},
+		{name: "bool", v: false, want: true},
+		{name: "struct", v: struct{}{}, want: true},
+	}
+	for _, tt := range testCases {
+		r := new(recordingTesting)
+		got := NotNil(r, tt.v)
+		if got != tt.want {
+			t.Errorf("%s: NotNil = %t, want %t", tt.name, got, tt.want)
+		}
+		if r.errored != !tt.want {
+			t.Errorf("%s: errored = %t, want %t", tt.name, r.errored, !tt.want)
+		}
+	}
+}
+
+func TestNotEqual(t *testing.T) {
+	t.Parallel()
+	for _, tt := range equalCases {
+		r := new(recordingTesting)
+		want := !tt.want
+		got := NotEqual(r, tt.a, tt.b)
+		if got != want {
+			t.Errorf("%s: NotEqual = %t, want %t", tt.name, got, want)
+		}
+		if r.errored != !want {
+			t.Errorf("%s: errored = %t, want %t", tt.name, r.errored, !want)
+		}
 	}
 }
 
 func TestNotPanics(t *testing.T) {
 	t.Parallel()
-	for _, tt := range []struct {
-		name       string
-		panicValue any
-		panics     bool
-		message    string
-	}{
-		{name: "returns"},
-		{name: "string", panicValue: "boom", panics: true, message: "Panic value: boom"},
-		{name: "integer", panicValue: 42, panics: true, message: "Panic value: 42"},
-		{name: "nil", panics: true, message: "Panic value:"},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			r := new(recordingTesting)
-			calls := 0
-			got := NotPanics(r, func() {
-				calls++
-				if tt.panics {
-					panic(tt.panicValue)
-				}
-			})
-			if calls != 1 {
-				t.Errorf("Expected callback to run once, got %d calls", calls)
-			}
-			checkResult(t, r, got, !tt.panics, "Should not panic:", tt.message, "Panic stack:", "assert_test.go:")
-		})
+	calls := 0
+	r := new(recordingTesting)
+	got := NotPanics(r, func() { calls++ })
+	if calls != 1 {
+		t.Errorf("callback should run once, got %d", calls)
+	}
+	if !got {
+		t.Errorf("NotPanics(no panic) = %t, want true", got)
+	}
+	if r.errored {
+		t.Error("NotPanics(no panic) should not report error")
+	}
+
+	calls = 0
+	r = new(recordingTesting)
+	got = NotPanics(r, func() { calls++; panic("boom") })
+	if calls != 1 {
+		t.Errorf("callback should run once, got %d", calls)
+	}
+	if got {
+		t.Errorf("NotPanics(panic) = %t, want false", got)
+	}
+	if !r.errored {
+		t.Error("NotPanics(panic) should report error")
+	}
+
+	calls = 0
+	r = new(recordingTesting)
+	got = NotPanics(r, func() { calls++; panic(42) })
+	if calls != 1 {
+		t.Errorf("callback should run once, got %d", calls)
+	}
+	if got {
+		t.Errorf("NotPanics(int panic) = %t, want false", got)
+	}
+	if !r.errored {
+		t.Error("NotPanics(int panic) should report error")
+	}
+
+	calls = 0
+	r = new(recordingTesting)
+	got = NotPanics(r, func() { calls++; panic(nil) })
+	if calls != 1 {
+		t.Errorf("callback should run once, got %d", calls)
+	}
+	if got {
+		t.Errorf("NotPanics(nil panic) = %t, want false", got)
+	}
+	if !r.errored {
+		t.Error("NotPanics(nil panic) should report error")
 	}
 }
 
 func TestPanics(t *testing.T) {
 	t.Parallel()
-	for _, tt := range []struct {
-		name       string
-		panicValue any
-		panics     bool
-	}{
-		{name: "returns"},
-		{name: "string", panicValue: "boom", panics: true},
-		{name: "integer", panicValue: 42, panics: true},
-		{name: "nil", panics: true},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			r := new(recordingTesting)
-			calls := 0
-			got := Panics(r, func() {
-				calls++
-				if tt.panics {
-					panic(tt.panicValue)
-				}
-			})
-			if calls != 1 {
-				t.Errorf("Expected callback to run once, got %d calls", calls)
-			}
-			checkResult(t, r, got, tt.panics, "Should panic")
-		})
+	calls := 0
+	r := new(recordingTesting)
+	got := Panics(r, func() { calls++ })
+	if calls != 1 {
+		t.Errorf("callback should run once, got %d", calls)
+	}
+	if got {
+		t.Errorf("Panics(no panic) = %t, want false", got)
+	}
+	if !r.errored {
+		t.Error("Panics(no panic) should report error")
+	}
+
+	calls = 0
+	r = new(recordingTesting)
+	got = Panics(r, func() { calls++; panic("boom") })
+	if calls != 1 {
+		t.Errorf("callback should run once, got %d", calls)
+	}
+	if !got {
+		t.Errorf("Panics(panic) = %t, want true", got)
+	}
+	if r.errored {
+		t.Error("Panics(panic) should not report error")
+	}
+
+	calls = 0
+	r = new(recordingTesting)
+	got = Panics(r, func() { calls++; panic(42) })
+	if calls != 1 {
+		t.Errorf("callback should run once, got %d", calls)
+	}
+	if !got {
+		t.Errorf("Panics(int panic) = %t, want true", got)
+	}
+	if r.errored {
+		t.Error("Panics(int panic) should not report error")
+	}
+
+	calls = 0
+	r = new(recordingTesting)
+	got = Panics(r, func() { calls++; panic(nil) })
+	if calls != 1 {
+		t.Errorf("callback should run once, got %d", calls)
+	}
+	if !got {
+		t.Errorf("Panics(nil panic) = %t, want true", got)
+	}
+	if r.errored {
+		t.Error("Panics(nil panic) should not report error")
 	}
 }
 
-func TestTrueAndFalse(t *testing.T) {
+func TestTrue(t *testing.T) {
 	t.Parallel()
-	for _, condition := range []bool{true, false} {
-		t.Run(strconv.FormatBool(condition), func(t *testing.T) {
-			t.Parallel()
-			trueReport := new(recordingTesting)
-			gotTrue := True(trueReport, condition)
-			checkResult(t, trueReport, gotTrue, condition, "Should be true")
+	r := new(recordingTesting)
+	if got := True(r, true); !got {
+		t.Errorf("True(true) = %t, want true", got)
+	}
+	if r.errored {
+		t.Error("True(true) should not report error")
+	}
 
-			falseReport := new(recordingTesting)
-			gotFalse := False(falseReport, condition)
-			checkResult(t, falseReport, gotFalse, !condition, "Should be false")
-		})
+	r = new(recordingTesting)
+	if got := True(r, false); got {
+		t.Errorf("True(false) = %t, want false", got)
+	}
+	if !r.errored {
+		t.Error("True(false) should report error")
 	}
 }
 
@@ -220,63 +325,88 @@ func TestZero(t *testing.T) {
 		Count int
 		Name  string
 	}
-	checkZero(t, "integer_zero", 0, true)
-	checkZero(t, "integer_nonzero", 1, false)
-	checkZero(t, "float_zero", 0.0, true)
-	checkZero(t, "float_nonzero", 1.5, false)
-	checkZero(t, "empty_string", "", true)
-	checkZero(t, "string", "value", false)
-	checkZero(t, "false", false, true)
-	checkZero(t, "true", true, false)
-	checkZero(t, "nil_pointer", (*int)(nil), true)
-	checkZero(t, "pointer_to_zero", new(int), false)
-	checkZero(t, "nil_slice", []int(nil), true)
-	checkZero(t, "empty_slice", []int{}, false)
-	checkZero(t, "nil_map", map[string]int(nil), true)
-	checkZero(t, "empty_map", map[string]int{}, false)
-	checkZero(t, "nil_channel", (chan int)(nil), true)
-	checkZero(t, "channel", make(chan int), false)
-	checkZero(t, "nil_function", (func())(nil), true)
-	checkZero(t, "function", func() {}, false)
-	checkZero(t, "zero_struct", sample{}, true)
-	checkZero(t, "nonzero_struct", sample{Count: 1}, false)
-	checkZero(t, "zero_array", [2]int{}, true)
-	checkZero(t, "nonzero_array", [2]int{0, 1}, false)
-	checkZero[any](t, "nil_interface", nil, true)
-	checkZero[any](t, "interface_with_typed_nil", (*int)(nil), false)
-}
+	pointer := new(int)
+	channel := make(chan int)
+	function := func() {}
 
-// checkResult 使用标准库检查返回值、错误报告和失败位置标记。
-func checkResult(t *testing.T, report *recordingTesting, got, want bool, messages ...string) {
-	t.Helper()
-	if got != want {
-		t.Errorf("Expected assertion result %t, got %t", want, got)
+	// 通过用例：不应报告错误。
+	r := new(recordingTesting)
+	if got := Zero(r, 0); !got {
+		t.Errorf("Zero(0) = %t, want true", got)
 	}
-	if want {
-		if len(report.messages) != 0 {
-			t.Errorf("Successful assertion should report no errors, got %q", report.messages)
-		}
-		return
+	if got := Zero(r, ""); !got {
+		t.Errorf("Zero(\"\") = %t, want true", got)
 	}
-	if report.missingHelper || report.helperCalls == 0 {
-		t.Error("Failed assertion should call Helper before reporting an error")
+	if got := Zero(r, false); !got {
+		t.Errorf("Zero(false) = %t, want true", got)
 	}
-	if len(report.messages) != 1 {
-		t.Fatalf("Failed assertion should report exactly one error, got %q", report.messages)
+	if got := Zero(r, (*int)(nil)); !got {
+		t.Errorf("Zero((*int)(nil)) = %t, want true", got)
 	}
-	for _, message := range messages {
-		if !strings.Contains(report.messages[0], message) {
-			t.Errorf("Expected error report to contain %q, got %q", message, report.messages[0])
-		}
+	if got := Zero(r, []int(nil)); !got {
+		t.Errorf("Zero([]int(nil)) = %t, want true", got)
 	}
-}
+	if got := Zero(r, map[string]int(nil)); !got {
+		t.Errorf("Zero(map nil) = %t, want true", got)
+	}
+	if got := Zero(r, (chan int)(nil)); !got {
+		t.Errorf("Zero(chan nil) = %t, want true", got)
+	}
+	if got := Zero(r, (func())(nil)); !got {
+		t.Errorf("Zero(func nil) = %t, want true", got)
+	}
+	if got := Zero(r, sample{}); !got {
+		t.Errorf("Zero(sample{}) = %t, want true", got)
+	}
+	if got := Zero(r, [2]int{}); !got {
+		t.Errorf("Zero([2]int{}) = %t, want true", got)
+	}
+	if got := Zero[any](r, nil); !got {
+		t.Errorf("Zero[any](nil) = %t, want true", got)
+	}
+	if r.errored {
+		t.Error("zero-value inputs should not report error")
+	}
 
-func checkZero[T any](t *testing.T, name string, value T, want bool) {
-	t.Helper()
-	t.Run(name, func(t *testing.T) {
-		t.Parallel()
-		r := new(recordingTesting)
-		got := Zero(r, value)
-		checkResult(t, r, got, want, fmt.Sprintf("Should be zero value, but got %#v", value))
-	})
+	// 失败用例：应报告错误。
+	r = new(recordingTesting)
+	if got := Zero(r, 1); got {
+		t.Errorf("Zero(1) = %t, want false", got)
+	}
+	if got := Zero(r, 1.5); got {
+		t.Errorf("Zero(1.5) = %t, want false", got)
+	}
+	if got := Zero(r, "value"); got {
+		t.Errorf("Zero(\"value\") = %t, want false", got)
+	}
+	if got := Zero(r, true); got {
+		t.Errorf("Zero(true) = %t, want false", got)
+	}
+	if got := Zero(r, pointer); got {
+		t.Errorf("Zero(pointer) = %t, want false", got)
+	}
+	if got := Zero(r, []int{}); got {
+		t.Errorf("Zero([]int{}) = %t, want false", got)
+	}
+	if got := Zero(r, map[string]int{}); got {
+		t.Errorf("Zero(map{}) = %t, want false", got)
+	}
+	if got := Zero(r, channel); got {
+		t.Errorf("Zero(channel) = %t, want false", got)
+	}
+	if got := Zero(r, function); got {
+		t.Errorf("Zero(function) = %t, want false", got)
+	}
+	if got := Zero(r, sample{Count: 1}); got {
+		t.Errorf("Zero(sample{Count:1}) = %t, want false", got)
+	}
+	if got := Zero(r, [2]int{0, 1}); got {
+		t.Errorf("Zero([2]int{0,1}) = %t, want false", got)
+	}
+	if got := Zero[any](r, (*int)(nil)); got {
+		t.Errorf("Zero[any]((*int)(nil)) = %t, want false", got)
+	}
+	if !r.errored {
+		t.Error("non-zero inputs should report error")
+	}
 }

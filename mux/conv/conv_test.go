@@ -20,7 +20,6 @@ func TestParseBool(t *testing.T) {
 		assert.Nil(t, err)
 		assert.False(t, value)
 	}
-
 	// 非法取值
 	for _, s := range []string{"", "2", "True", "FALSE", "yes", "no"} {
 		_, err := ParseBool(s)
@@ -30,207 +29,194 @@ func TestParseBool(t *testing.T) {
 
 func TestParseBytes(t *testing.T) {
 	t.Parallel()
-	value, err := ParseBytes("hello")
-	assert.Nil(t, err)
-	assert.Equal(t, []byte("hello"), value)
-
-	value, err = ParseBytes("")
-	assert.Nil(t, err)
-	assert.Equal(t, []byte{}, value)
-
-	// 中文字符
-	value, err = ParseBytes("你好")
-	assert.Nil(t, err)
-	assert.Equal(t, []byte("你好"), value)
+	// 合法取值
+	testCases := []struct {
+		arg  string
+		want []byte
+	}{
+		{arg: "hello", want: []byte("hello")},
+		{arg: "", want: []byte{}},
+		{arg: "你好", want: []byte("你好")},
+	}
+	for _, tt := range testCases {
+		value, err := ParseBytes(tt.arg)
+		assert.Nil(t, err)
+		assert.Equal(t, tt.want, value)
+	}
 }
 
 func TestParseEnum(t *testing.T) {
 	t.Parallel()
 	type status int32
-
-	// 合法数值
-	value, err := ParseEnum[status]("0")
-	assert.Nil(t, err)
-	assert.Equal(t, status(0), value)
-
-	value, err = ParseEnum[status]("42")
-	assert.Nil(t, err)
-	assert.Equal(t, status(42), value)
-
-	// 负数
-	value, err = ParseEnum[status]("-1")
-	assert.Nil(t, err)
-	assert.Equal(t, status(-1), value)
-
-	// 超出 int32 范围
-	_, err = ParseEnum[status]("2147483648")
-	assert.NotNil(t, err)
-
-	// 非数字
-	_, err = ParseEnum[status]("abc")
-	assert.NotNil(t, err)
+	// 合法取值
+	testCases := []struct {
+		arg  string
+		want status
+	}{
+		{arg: "0", want: 0},
+		{arg: "42", want: 42},
+		{arg: "-1", want: -1},
+	}
+	for _, tt := range testCases {
+		value, err := ParseEnum[status](tt.arg)
+		assert.Nil(t, err)
+		assert.Equal(t, tt.want, value)
+	}
+	// 非法取值
+	for _, s := range []string{"2147483648", "abc"} {
+		_, err := ParseEnum[status](s)
+		assert.NotNil(t, err)
+	}
 }
 
 func TestParseFloat32(t *testing.T) {
 	t.Parallel()
-	// 普通数值
-	value, err := ParseFloat32("3.14")
-	assert.Nil(t, err)
-	assert.Equal(t, float32(3.14), value)
-
-	// 整数形式
-	value, err = ParseFloat32("10")
-	assert.Nil(t, err)
-	assert.Equal(t, float32(10), value)
-
-	// 科学计数法
-	value, err = ParseFloat32("1e3")
-	assert.Nil(t, err)
-	assert.Equal(t, float32(1000), value)
-
-	// 负数
-	value, err = ParseFloat32("-2.5")
-	assert.Nil(t, err)
-	assert.Equal(t, float32(-2.5), value)
-
-	// 超出 float32 范围
-	_, err = ParseFloat32("1e39")
-	assert.NotNil(t, err)
-
-	// 非数字
-	_, err = ParseFloat32("abc")
-	assert.NotNil(t, err)
+	// 合法取值
+	testCases := []struct {
+		arg  string
+		want float32
+	}{
+		{arg: "3.14", want: 3.14},
+		{arg: "10", want: 10},
+		{arg: "1e3", want: 1000},
+		{arg: "-2.5", want: -2.5},
+	}
+	for _, tt := range testCases {
+		value, err := ParseFloat32(tt.arg)
+		assert.Nil(t, err)
+		assert.Equal(t, tt.want, value)
+	}
+	// 非法取值
+	for _, s := range []string{"1e39", "abc"} {
+		_, err := ParseFloat32(s)
+		assert.NotNil(t, err)
+	}
 }
 
 func TestParseFloat64(t *testing.T) {
 	t.Parallel()
-	// 普通数值
-	value, err := ParseFloat64("3.141592653589793")
-	assert.Nil(t, err)
-	assert.Equal(t, 3.141592653589793, value)
-
-	// float32 超范围但 float64 合法的数值
-	value, err = ParseFloat64("1e39")
-	assert.Nil(t, err)
-	assert.Equal(t, 1e39, value)
-
-	// 超出 float64 范围
-	_, err = ParseFloat64("1e309")
-	assert.NotNil(t, err)
-
-	// 非数字
-	_, err = ParseFloat64("abc")
-	assert.NotNil(t, err)
+	// 合法取值
+	testCases := []struct {
+		arg  string
+		want float64
+	}{
+		{arg: "3.141592653589793", want: 3.141592653589793},
+		{arg: "1e39", want: 1e39},
+	}
+	for _, tt := range testCases {
+		value, err := ParseFloat64(tt.arg)
+		assert.Nil(t, err)
+		assert.Equal(t, tt.want, value)
+	}
+	// 非法取值
+	for _, s := range []string{"1e309", "abc"} {
+		_, err := ParseFloat64(s)
+		assert.NotNil(t, err)
+	}
 }
 
 func TestParseInt32(t *testing.T) {
 	t.Parallel()
-	// 合法数值
-	value, err := ParseInt32("0")
-	assert.Nil(t, err)
-	assert.Equal(t, int32(0), value)
-
-	value, err = ParseInt32("2147483647")
-	assert.Nil(t, err)
-	assert.Equal(t, int32(math.MaxInt32), value)
-
-	value, err = ParseInt32("-2147483648")
-	assert.Nil(t, err)
-	assert.Equal(t, int32(math.MinInt32), value)
-
-	// 超出范围
-	_, err = ParseInt32("2147483648")
-	assert.NotNil(t, err)
-
-	_, err = ParseInt32("-2147483649")
-	assert.NotNil(t, err)
-
-	// 非十进制形式
-	for _, s := range []string{"0x10", "1.5", "abc", "", "1e3"} {
-		_, err = ParseInt32(s)
+	// 合法取值
+	testCases := []struct {
+		arg  string
+		want int32
+	}{
+		{arg: "0", want: 0},
+		{arg: "2147483647", want: math.MaxInt32},
+		{arg: "-2147483648", want: math.MinInt32},
+	}
+	for _, tt := range testCases {
+		value, err := ParseInt32(tt.arg)
+		assert.Nil(t, err)
+		assert.Equal(t, tt.want, value)
+	}
+	// 非法取值
+	for _, s := range []string{"2147483648", "-2147483649", "0x10", "1.5", "abc", "", "1e3"} {
+		_, err := ParseInt32(s)
 		assert.NotNil(t, err)
 	}
 }
 
 func TestParseInt64(t *testing.T) {
 	t.Parallel()
-	// 合法数值
-	value, err := ParseInt64("0")
-	assert.Nil(t, err)
-	assert.Equal(t, int64(0), value)
-
-	value, err = ParseInt64("9223372036854775807")
-	assert.Nil(t, err)
-	assert.Equal(t, int64(math.MaxInt64), value)
-
-	value, err = ParseInt64("-9223372036854775808")
-	assert.Nil(t, err)
-	assert.Equal(t, int64(math.MinInt64), value)
-
-	// 超出范围
-	_, err = ParseInt64("9223372036854775808")
-	assert.NotNil(t, err)
-
-	// 非数字
-	_, err = ParseInt64("abc")
-	assert.NotNil(t, err)
+	// 合法取值
+	testCases := []struct {
+		arg  string
+		want int64
+	}{
+		{arg: "0", want: 0},
+		{arg: "9223372036854775807", want: math.MaxInt64},
+		{arg: "-9223372036854775808", want: math.MinInt64},
+	}
+	for _, tt := range testCases {
+		value, err := ParseInt64(tt.arg)
+		assert.Nil(t, err)
+		assert.Equal(t, tt.want, value)
+	}
+	// 非法取值
+	for _, s := range []string{"9223372036854775808", "abc"} {
+		_, err := ParseInt64(s)
+		assert.NotNil(t, err)
+	}
 }
 
 func TestParseString(t *testing.T) {
 	t.Parallel()
-	value, err := ParseString("hello")
-	assert.Nil(t, err)
-	assert.Equal(t, "hello", value)
-
-	value, err = ParseString("")
-	assert.Nil(t, err)
-	assert.Equal(t, "", value)
+	testCases := []struct {
+		arg  string
+		want string
+	}{
+		{arg: "hello", want: "hello"},
+		{arg: "", want: ""},
+	}
+	for _, tt := range testCases {
+		value, err := ParseString(tt.arg)
+		assert.Nil(t, err)
+		assert.Equal(t, tt.want, value)
+	}
 }
 
 func TestParseUint32(t *testing.T) {
 	t.Parallel()
-	// 合法数值
-	value, err := ParseUint32("0")
-	assert.Nil(t, err)
-	assert.Equal(t, uint32(0), value)
-
-	value, err = ParseUint32("4294967295")
-	assert.Nil(t, err)
-	assert.Equal(t, uint32(math.MaxUint32), value)
-
-	// 负数
-	_, err = ParseUint32("-1")
-	assert.NotNil(t, err)
-
-	// 超出范围
-	_, err = ParseUint32("4294967296")
-	assert.NotNil(t, err)
-
-	// 非数字
-	_, err = ParseUint32("abc")
-	assert.NotNil(t, err)
+	// 合法取值
+	testCases := []struct {
+		arg  string
+		want uint32
+	}{
+		{arg: "0", want: 0},
+		{arg: "4294967295", want: math.MaxUint32},
+	}
+	for _, tt := range testCases {
+		value, err := ParseUint32(tt.arg)
+		assert.Nil(t, err)
+		assert.Equal(t, tt.want, value)
+	}
+	// 非法取值
+	for _, s := range []string{"-1", "4294967296", "abc"} {
+		_, err := ParseUint32(s)
+		assert.NotNil(t, err)
+	}
 }
 
 func TestParseUint64(t *testing.T) {
 	t.Parallel()
-	// 合法数值
-	value, err := ParseUint64("0")
-	assert.Nil(t, err)
-	assert.Equal(t, uint64(0), value)
-
-	value, err = ParseUint64("18446744073709551615")
-	assert.Nil(t, err)
-	assert.Equal(t, uint64(math.MaxUint64), value)
-
-	// 负数
-	_, err = ParseUint64("-1")
-	assert.NotNil(t, err)
-
-	// 超出范围
-	_, err = ParseUint64("18446744073709551616")
-	assert.NotNil(t, err)
-
-	// 非数字
-	_, err = ParseUint64("abc")
-	assert.NotNil(t, err)
+	// 合法取值
+	testCases := []struct {
+		arg  string
+		want uint64
+	}{
+		{arg: "0", want: 0},
+		{arg: "18446744073709551615", want: math.MaxUint64},
+	}
+	for _, tt := range testCases {
+		value, err := ParseUint64(tt.arg)
+		assert.Nil(t, err)
+		assert.Equal(t, tt.want, value)
+	}
+	// 非法取值
+	for _, s := range []string{"-1", "18446744073709551616", "abc"} {
+		_, err := ParseUint64(s)
+		assert.NotNil(t, err)
+	}
 }

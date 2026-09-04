@@ -81,3 +81,8 @@ linters:
         rules:
           json: snake
           yaml: camel
+  exclusions:
+    paths:
+      - "_test\\.go"
+    linters:
+      - dupl
