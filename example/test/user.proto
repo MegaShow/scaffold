@@ -1,0 +1,48 @@
+edition = "2024";
+
+package example;
+
+option go_package = "example.com/user/gen";
+
+import "api/api.proto";
+
+// 创建用户请求
+message CreateUserRequest {
+  string email = 1; // 用户邮箱，登录凭证
+  string name = 2; // 用户昵称
+}
+
+// 创建用户响应
+message CreateUserResponse {
+  int32 user_id = 1; // 用户 ID
+  string name = 2; // 用户昵称
+}
+
+// 查询用户请求
+message GetUserRequest {
+  int32 user_id = 1; // 用户 ID
+  int64 ts = 2; // 没意义的时间戳
+}
+
+// 查询用户响应
+message GetUserResponse {
+  int32 user_id = 1; // 用户 ID
+  string name = 2; // 用户昵称
+}
+
+// 用户服务
+service UserService {
+  // 创建用户
+  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse) {
+    option (api.http) = {
+      post: "/users"
+    };
+  }
+
+  // 查询用户
+  rpc GetUser(GetUserRequest) returns (GetUserResponse) {
+    option (api.http) = {
+      get: "/users/{user_id}"
+    };
+  }
+}

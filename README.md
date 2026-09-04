@@ -26,75 +26,29 @@ Scaffold 的 IDL 代码生成依赖于 protoc，因此在使用前需要安装�
 通过源代码编译安装：
 
 ```sh
-go install go.icytown.com/scaffold@latest
+go install go.icytown.com/scaffold/cmd/protoc-gen-scaffold@latest
 ```
 
 或者直接前往 [GitHub Release](https://github.com/megashow/scaffold/releases) 下载对应二进制文件。
 
 ## 使用
 
-### 声明 IDL 和生成服务代码
-
-创建一个 proto 文件。
-
-```proto
-// user.proto
-edition = "2024";
-
-package com.example.user;
-
-option go_package = "example.com/user";
-
-import "api/api.proto";
-
-message GetUserRequest {
-  string user_id = 1;
-}
-
-message GetUserResponse {
-  string user_id = 1;
-  string name = 2;
-}
-
-service UserService {
-  rpc GetUser(GetUserRequest) returns (GetUserResponse) {
-    option (api.http) = {
-      get: "/users/{user_id}"
-    };
-  }
-}
-```
-
-执行命令。
-
 ```sh
-protoc-gen-scaffold -lang=go -kind=server -include=. user.proto
+protoc-gen-scaffold [flags] [proto file]
 ```
 
-### 实现服务接口
+| Flag       | 介绍                                    |
+| ---------- | --------------------------------------- |
+| `-include` | 查找 proto 文件的目录，允许指定多个     |
+| `-lang`    | 生成代码语言                            |
+| `-kind`    | 生成代码类型 (server/client)            |
+| `-out`     | 生成代码的输出目录                      |
+| `-protoc`  | protoc 可执行文件路径，默认从 PATH 查找 |
 
-```go
-type ServiceImpl struct {}
+具体代码生成和使用见以下文档：
 
-func (s *ServiceImpl) GetUser(ctx context.Context, req *gen.GetUserRequest) (*gen.GetUserResponse, error) {
-	return &gen.GetUserResponse{UserID: req.UserID, Name: "Test User"}, nil
-}
-```
+- [Go Server 使用文档](docs/go-server.md)
 
-### 在 Web 框架中注册服务
+## 协议
 
-```go
-import (
-	"net/http"
-
-	"go.icytown.com/scaffold/mux"
-)
-
-func createServeMux() *http.ServeMux {
-	serveMux := http.NewServeMux()
-	parser := &mux.AdaptParser{Form: &mux.FormParser{}, JSON: &mux.JSONParser{}}
-	renderer := &mux.JSONRenderer{}
-	gen.RegisterUserService(serveMux, &ServiceImpl{}, parser, renderer)
-	return serveMux
-}
-```
+Scaffold 基于 MIT 协议开源。

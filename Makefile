@@ -24,9 +24,9 @@ endif
 
 
 # 构建脚手架生成器二进制
-build:
-	@echo "Building protoc-gen-scaffold (version: $(if $(VERSION),$(VERSION),dev))"
-	@go build -ldflags "-X go.icytown.com/scaffold/internal/generator.injectedVersion=$(VERSION)" \
+build-dev:
+	@echo "Building protoc-gen-scaffold (version: dev)"
+	@go build -ldflags "-X go.icytown.com/scaffold/internal/generator.injectedVersion=dev" \
 		-o $(BIN)/protoc-gen-scaffold ./cmd/protoc-gen-scaffold
 	@echo "Protoc-gen-scaffold build success"
 
@@ -43,22 +43,14 @@ gen-api: $(BIN)/protoc $(BIN)/protoc-gen-go
 
 
 # 生成 example 演示代码
-gen-example: build $(BIN)/protoc
+gen-example: build-dev $(BIN)/protoc
 	@echo "Generate example source code"
 	@mkdir -p ./example/dev
-	@go run ./cmd/protoc-gen-scaffold -protoc=$(BIN)/protoc \
-		-lang=go -kind=server \
-		-out=./example/dev \
-		-include=. \
-		-include=./example/dev \
-		test.proto
+	@mkdir -p ./example/test/gen
 	@mkdir -p ./example/go-server/gen
-	@go run ./cmd/protoc-gen-scaffold -protoc=$(BIN)/protoc \
-		-lang=go -kind=server \
-		-out=./example/go-server/gen \
-		-include=. \
-		-include=./example \
-		user.proto
+	@cd ./example/dev && $(BIN)/protoc-gen-scaffold -protoc=$(BIN)/protoc -lang=go -kind=server test.proto
+	@cd ./example/test && $(BIN)/protoc-gen-scaffold -protoc=$(BIN)/protoc -out=./gen -lang=go -kind=server user.proto
+	@cd ./example && $(BIN)/protoc-gen-scaffold -protoc=$(BIN)/protoc -out=./go-server/gen -lang=go -kind=server user.proto
 	@echo "Generate example source code success"
 
 

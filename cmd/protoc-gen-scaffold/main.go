@@ -5,16 +5,19 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"google.golang.org/protobuf/compiler/protogen"
 	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/pluginpb"
 
+	"go.icytown.com/scaffold/api"
 	"go.icytown.com/scaffold/internal/generator"
 )
 
@@ -112,6 +115,13 @@ func runCLI(files []string) error {
 		return fmt.Errorf("resolve own executable path: %w", err)
 	}
 
+	// 确保可执行文件同目录下存在 api/api.proto，供 protoc 通过 -I 解析
+	// import "api/api.proto"。go install 安装场景下该文件不会随二进制分发，
+	// 因此从内嵌内容释放；已存在且内容一致时跳过，内容过期则同步为当前版本。
+	if err := ensureApiProto(filepath.Dir(self)); err != nil {
+		return err
+	}
+
 	// 声明 module 时按 go_package 剥离模块前缀定位输出目录，否则镜像 proto 源文件相对路径
 	paths := "source_relative"
 	if *module != "" {
@@ -123,6 +133,8 @@ func runCLI(files []string) error {
 		"--plugin=protoc-gen-scaffold="+self,
 		"--scaffold_out="+*out,
 		"--scaffold_opt=paths="+paths+",lang="+*lang+",kind="+*kind,
+		"-I.",
+		"-I"+filepath.Dir(self),
 	)
 	for _, inc := range includes {
 		args = append(args, "-I"+inc)
@@ -134,6 +146,30 @@ func runCLI(files []string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
+}
+
+// ensureApiProto 确保 selfDir 下存在 api/api.proto 且内容与内嵌版本一致。
+// 文件缺失时创建；存在但与内嵌内容不一致时（例如旧版本遗留）覆盖为当前版本，
+// 保证 protoc 解析到的 api.proto 与当前二进制匹配。
+func ensureApiProto(selfDir string) error {
+	apiDir := filepath.Join(selfDir, "api")
+	target := filepath.Join(apiDir, "api.proto")
+
+	if existing, err := os.ReadFile(target); err == nil { //nolint:gosec // target 由 os.Executable() 目录拼接固定子路径得到，非用户输入
+		if bytes.Equal(existing, api.Proto) {
+			return nil
+		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("read %s: %w", target, err)
+	}
+
+	if err := os.MkdirAll(apiDir, 0o750); err != nil {
+		return fmt.Errorf("create api dir %s: %w", apiDir, err)
+	}
+	if err := os.WriteFile(target, api.Proto, 0o600); err != nil {
+		return fmt.Errorf("write %s: %w", target, err)
+	}
+	return nil
 }
 
 // generateFile 把单个 protobuf 文件转换为中间模型并生成脚手架代码，
