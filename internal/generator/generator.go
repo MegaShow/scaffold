@@ -40,7 +40,8 @@ type Generator interface {
 type Language string
 
 const (
-	LanguageGo Language = "go"
+	LanguageGo         Language = "go"
+	LanguageTypeScript Language = "typescript"
 )
 
 // Kind 是生成代码的类型。
@@ -56,6 +57,8 @@ func New(lang Language, kind Kind) (Generator, error) {
 	switch {
 	case lang == LanguageGo && kind == KindServer:
 		return &goServerGenerator{}, nil
+	case lang == LanguageTypeScript && kind == KindClient:
+		return &tsClientGenerator{}, nil
 	default:
 		return nil, fmt.Errorf("generator: unsupported language %q with kind %q", lang, kind)
 	}

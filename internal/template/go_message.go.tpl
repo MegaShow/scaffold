@@ -21,14 +21,14 @@ package {{ .Package }}
 {{ end }}
 
 {{- range .Enums }}
-  {{ renderGoComment .Comment }}
+  {{ renderLineComment .Comment }}
   type {{ .Name }} int32
 
   const (
     {{- $enum := . }}
     {{- range .Values }}
       {{- if .Comment }}
-        {{ renderGoComment .Comment }}
+        {{ renderLineComment .Comment }}
       {{- end }}
       {{ .Name }} {{ $enum.Name }} = {{ .Number }}
     {{- end }}
@@ -36,15 +36,15 @@ package {{ .Package }}
 {{ end }}
 
 {{ range .Messages }}
-  {{ renderGoComment .Comment }}
+  {{ renderLineComment .Comment }}
   type {{ .Name }} struct {
     {{ range .Fields }}
       {{- if contains .Comment "\n" }}
-        {{- renderGoComment .Comment }}
+        {{- renderLineComment .Comment }}
       {{- end -}}
       {{ renderGoName .Name }} {{ if .Repeated }}[]{{ end }}{{ renderGoType .Type }} `json:"{{ .Name }}"`
       {{- if not (contains .Comment "\n") -}}
-        {{- renderGoComment .Comment -}}
+        {{- renderLineComment .Comment -}}
       {{- end }}
     {{ end -}}
   }

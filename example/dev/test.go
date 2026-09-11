@@ -19,8 +19,8 @@ import (
 type State int32
 
 const (
-	State_STATE_UNSPECIFIED State = 0
-	State_STATE_ACTIVE      State = 1
+	State_UNSPECIFIED State = 0
+	State_ACTIVE      State = 1
 )
 
 // 全类型示例的子消息。

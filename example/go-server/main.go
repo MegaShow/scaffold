@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -13,7 +12,7 @@ import (
 type ServiceImpl struct{}
 
 func (s *ServiceImpl) GetUser(ctx context.Context, req *gen.GetUserRequest) (*gen.GetUserResponse, error) {
-	return &gen.GetUserResponse{UserID: req.UserID, Name: fmt.Sprintf("User %d", req.UserID)}, nil
+	return &gen.GetUserResponse{UserID: req.UserID, Name: "User " + req.UserID}, nil
 }
 
 func createServeMux() *http.ServeMux {

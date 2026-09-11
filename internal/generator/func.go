@@ -1,6 +1,8 @@
 package generator
 
 import (
+	"errors"
+	"fmt"
 	"path"
 	"strings"
 
@@ -11,11 +13,76 @@ func init() {
 	template.RegisterFuncs(map[string]any{
 		"contains":          strings.Contains,
 		"isEmptyType":       isEmptyType,
-		"renderGoComment":   renderGoComment,
+		"renderDocComment":  renderDocComment,
 		"renderGoName":      renderGoName,
 		"renderGoNamedType": renderGoNamedType,
 		"renderGoType":      renderGoType,
+		"renderLineComment": renderLineComment,
+		"renderTSType":      renderTSType,
+		"trimPrefix":        strings.TrimPrefix,
 	})
+}
+
+// collectPathParams 提取路由 Pattern 中的单段路径参数名，并校验请求消息存在同名的标量或枚举字段。
+func collectPathParams(file *File, method *Method) ([]string, error) {
+	var params []string
+	seen := make(map[string]bool)
+	for segment := range strings.SplitSeq(method.Pattern, "/") {
+		if !strings.ContainsAny(segment, "{}") {
+			continue
+		}
+		name, ok := strings.CutPrefix(segment, "{")
+		if !ok {
+			return nil, fmt.Errorf("invalid path parameter %q", segment)
+		}
+		name, ok = strings.CutSuffix(name, "}")
+		if !ok || name == "" || strings.ContainsAny(name, "{}.$") {
+			return nil, fmt.Errorf("unsupported path parameter %q: only {name} is supported", segment)
+		}
+		if seen[name] {
+			return nil, fmt.Errorf("duplicate path parameter %q", name)
+		}
+		seen[name] = true
+		params = append(params, name)
+	}
+	if len(params) == 0 {
+		return nil, nil
+	}
+	if isEmptyType(method.RequestType) {
+		return nil, errors.New("path parameters are not allowed when request type is api.Empty")
+	}
+	if method.RequestType == nil || method.RequestType.Kind != KindMessage || method.RequestType.ImportPath != "" {
+		return nil, errors.New("path parameters require a request message defined in the current file")
+	}
+	var request *Message
+	for _, message := range file.Messages {
+		if message.Name == method.RequestType.Name {
+			request = message
+			break
+		}
+	}
+	if request == nil {
+		return nil, fmt.Errorf("request message %q not found", method.RequestType.Name)
+	}
+	fields := make(map[string]*Field, len(request.Fields))
+	for _, field := range request.Fields {
+		fields[field.Name] = field
+	}
+	for _, name := range params {
+		field := fields[name]
+		if field == nil {
+			return nil, fmt.Errorf("path parameter %q has no matching field in request %s", name, request.Name)
+		}
+		if field.Repeated || field.Type == nil {
+			return nil, fmt.Errorf("path parameter %q must be a scalar or enum field", name)
+		}
+		switch field.Type.Kind {
+		case KindBool, KindInt32, KindInt64, KindUint32, KindUint64, KindFloat32, KindFloat64, KindString, KindBytes, KindEnum:
+		default:
+			return nil, fmt.Errorf("path parameter %q must be a scalar or enum field", name)
+		}
+	}
+	return params, nil
 }
 
 // isEmptyType 判断类型是否为 api.Empty，不将其他无字段消息视为空类型。
@@ -24,8 +91,31 @@ func isEmptyType(t *Type) bool {
 		t.ImportPath == "go.icytown.com/scaffold/internal/gen/api"
 }
 
-// renderGoComment 把原始注释文本格式化为 Go 行注释块。
-func renderGoComment(comment string) string {
+// renderDocComment 把原始注释文本格式化为文档注释块。
+func renderDocComment(comment string) string {
+	comment = strings.TrimSpace(comment)
+	if comment == "" {
+		return ""
+	}
+	if !strings.Contains(comment, "\n") {
+		return "/** " + comment + " */"
+	}
+	var b strings.Builder
+	b.WriteString("/**\n")
+	for line := range strings.SplitSeq(comment, "\n") {
+		b.WriteString(" *")
+		if line != "" {
+			b.WriteByte(' ')
+			b.WriteString(strings.TrimPrefix(line, " "))
+		}
+		b.WriteByte('\n')
+	}
+	b.WriteString(" */")
+	return b.String()
+}
+
+// renderLineComment 把原始注释文本格式化为行注释块。
+func renderLineComment(comment string) string {
 	comment = strings.TrimSpace(comment)
 	if comment == "" {
 		return ""
@@ -104,6 +194,29 @@ func renderGoNamedType(t *Type) string {
 		return t.Name
 	}
 	return path.Base(t.ImportPath) + "." + t.Name
+}
+
+// renderTSType 渲染 TypeScript 类型，不支持数组（数组由调用方追加 []）。
+func renderTSType(t *Type) string {
+	if t == nil {
+		return "unknown"
+	}
+	switch t.Kind {
+	case KindBool:
+		return "boolean"
+	case KindInt32, KindInt64, KindUint32, KindUint64, KindFloat32, KindFloat64:
+		return "number"
+	case KindString:
+		return "string"
+	case KindBytes:
+		return "Uint8Array"
+	case KindEnum, KindMessage:
+		return t.Name
+	case KindMap:
+		return "Record<" + renderTSType(t.MapKey) + ", " + renderTSType(t.MapElem) + ">"
+	default:
+		return "unknown"
+	}
 }
 
 // versionLines 计算版本注释行：scaffold 自身与各依赖组件按名字长度对齐，组件名列取最长名字对齐后跟一个空格，保证版本号在同一列左对齐。

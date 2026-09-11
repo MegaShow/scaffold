@@ -23,16 +23,16 @@ package {{ .Package }}
 {{ range .Services }}
   {{ $wrapperName := printf "w%s" .Name }}
 
-  {{ renderGoComment .Comment }}
+  {{ renderLineComment .Comment }}
   type {{ .Name }} interface {
     {{ range .Methods }}
       {{- if contains .Comment "\n" }}
-        {{- renderGoComment .Comment }}
+        {{- renderLineComment .Comment }}
       {{- end -}}
       {{ .Name }}(ctx context.Context{{ if not (isEmptyType .RequestType) }}, req {{ renderGoType .RequestType }}{{ end }})
         {{- " " }}{{ if isEmptyType .ResponseType }}error{{ else }}({{ renderGoType .ResponseType }}, error){{ end }}
       {{- if not (contains .Comment "\n") -}}
-        {{- renderGoComment .Comment -}}
+        {{- renderLineComment .Comment -}}
       {{- end }}
     {{ end -}}
   }

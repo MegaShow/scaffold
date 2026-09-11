@@ -32,10 +32,12 @@ func (i *stringsFlag) String() string { return strings.Join(*i, ",") }
 
 var (
 	includes stringsFlag
-	lang     = flag.String("lang", "", "生成代码的目标语言")
+	format   = flag.String("format", "", "代码格式化工具 (prettier)")
 	kind     = flag.String("kind", "", "生成代码的类型")
+	lang     = flag.String("lang", "", "生成代码的目标语言")
 	module   = flag.String("module", "", "Go 模块路径，声明后按 go_package 去除模块前缀生成到对应目录")
 	out      = flag.String("out", ".", "生成代码的输出目录")
+	prettier = flag.String("prettier", "", "prettier 可执行文件路径，默认从 PATH 查找")
 	protoc   = flag.String("protoc", "", "protoc 可执行文件路径，默认从 PATH 查找")
 	version  bool
 )
@@ -74,6 +76,9 @@ func main() {
 
 	// 插件模式
 	protogen.Options{ParamFunc: flag.CommandLine.Set}.Run(func(gen *protogen.Plugin) error {
+		if err := validateFormat(); err != nil {
+			return fmt.Errorf("protoc-gen-scaffold: %w", err)
+		}
 		gen.SupportedFeatures = uint64(pluginpb.CodeGeneratorResponse_FEATURE_PROTO3_OPTIONAL | pluginpb.CodeGeneratorResponse_FEATURE_SUPPORTS_EDITIONS)
 		gen.SupportedEditionsMinimum = descriptorpb.Edition_EDITION_PROTO3
 		gen.SupportedEditionsMaximum = descriptorpb.Edition_EDITION_2024
@@ -98,6 +103,9 @@ func main() {
 func runCLI(files []string) error {
 	// 提前校验生成器组合，避免启动 protoc 子进程后才报错。
 	if _, err := generator.New(generator.Language(*lang), generator.Kind(*kind)); err != nil {
+		return err
+	}
+	if err := validateFormat(); err != nil {
 		return err
 	}
 
@@ -128,11 +136,16 @@ func runCLI(files []string) error {
 		paths = "import,module=" + *module
 	}
 
+	options := []string{"paths=" + paths, "lang=" + *lang, "kind=" + *kind, "format=" + *format}
+	if *format == "prettier" {
+		options = append(options, "prettier="+*prettier)
+	}
+
 	args := make([]string, 0, len(includes)+len(files)+3)
 	args = append(args,
 		"--plugin=protoc-gen-scaffold="+self,
 		"--scaffold_out="+*out,
-		"--scaffold_opt=paths="+paths+",lang="+*lang+",kind="+*kind,
+		"--scaffold_opt="+strings.Join(options, ","),
 		"-I.",
 		"-I"+filepath.Dir(self),
 	)
@@ -146,6 +159,21 @@ func runCLI(files []string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
+}
+
+// validateFormat 校验生成代码的格式化配置。
+func validateFormat() error {
+	switch *format {
+	case "":
+		return nil
+	case "prettier":
+		if *prettier == "" {
+			*prettier = "prettier"
+		}
+		return nil
+	default:
+		return fmt.Errorf("unsupported formatter %q", *format)
+	}
 }
 
 // ensureApiProto 确保 selfDir 下存在 api/api.proto 且内容与内嵌版本一致。
@@ -181,10 +209,49 @@ func generateFile(gen *protogen.Plugin, g generator.Generator, file *protogen.Fi
 	}
 
 	for _, f := range files {
+		if err := formatGeneratedFile(f); err != nil {
+			return err
+		}
 		out := gen.NewGeneratedFile(f.Path, file.GoImportPath)
 		if _, err := out.Write(f.Content); err != nil {
 			return err
 		}
 	}
+	return nil
+}
+
+// formatGeneratedFile 按配置选择生成代码的格式化方式。
+func formatGeneratedFile(file *generator.GeneratedFile) error {
+	switch *format {
+	case "":
+		return nil
+	case "prettier":
+		return formatWithPrettier(file)
+	default:
+		return fmt.Errorf("unsupported formatter %q", *format)
+	}
+}
+
+// formatWithPrettier 使用 Prettier 格式化生成的 TypeScript 代码。
+func formatWithPrettier(file *generator.GeneratedFile) error {
+	ext := strings.ToLower(filepath.Ext(file.Path))
+	if ext != ".ts" && ext != ".tsx" {
+		return nil
+	}
+
+	var stdout, stderr bytes.Buffer
+	//nolint:gosec,noctx // Prettier 路径由用户显式配置，子进程生命周期与生成器一致。
+	cmd := exec.Command(*prettier, "--stdin-filepath", file.Path)
+	cmd.Stdin = bytes.NewReader(file.Content)
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		message := strings.TrimSpace(stderr.String())
+		if message == "" {
+			return fmt.Errorf("format %s with prettier: %w", file.Path, err)
+		}
+		return fmt.Errorf("format %s with prettier: %w: %s", file.Path, err, message)
+	}
+	file.Content = stdout.Bytes()
 	return nil
 }

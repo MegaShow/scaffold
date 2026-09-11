@@ -1,5 +1,7 @@
-BIN := $(CURDIR)/bin
 VERSION := 0.1.0
+
+BIN := $(CURDIR)/bin
+NODE_BIN = $(CURDIR)/node_modules/.bin
 
 # 依赖版本
 # https://github.com/protocolbuffers/protobuf
@@ -43,14 +45,19 @@ gen-api: $(BIN)/protoc $(BIN)/protoc-gen-go
 
 
 # 生成 example 演示代码
-gen-example: build-dev $(BIN)/protoc
+gen-example: build-dev $(BIN)/protoc $(NODE_BIN)/prettier
 	@echo "Generate example source code"
 	@mkdir -p ./example/dev
 	@mkdir -p ./example/test/gen
 	@mkdir -p ./example/go-server/gen
+	@mkdir -p ./example/ts-client/gen
 	@cd ./example/dev && $(BIN)/protoc-gen-scaffold -protoc=$(BIN)/protoc -lang=go -kind=server test.proto
+	@cd ./example/dev && $(BIN)/protoc-gen-scaffold -protoc=$(BIN)/protoc -lang=typescript -kind=client \
+		-format=prettier -prettier=$(NODE_BIN)/prettier test.proto
 	@cd ./example/test && $(BIN)/protoc-gen-scaffold -protoc=$(BIN)/protoc -out=./gen -lang=go -kind=server user.proto
 	@cd ./example && $(BIN)/protoc-gen-scaffold -protoc=$(BIN)/protoc -out=./go-server/gen -lang=go -kind=server user.proto
+	@cd ./example && $(BIN)/protoc-gen-scaffold -protoc=$(BIN)/protoc -out=./ts-client/gen -lang=typescript -kind=client \
+		 -format=prettier -prettier=$(NODE_BIN)/prettier user.proto
 	@echo "Generate example source code success"
 
 
@@ -132,3 +139,11 @@ $(BIN)/protoc-gen-go: Makefile
 		mv $(BIN)/protoc-gen-go.exe $(BIN)/protoc-gen-go; \
 	fi; \
 	echo "Protoc-gen-go $(PROTOC_GEN_GO_VERSION) install success"
+
+
+# 安装 TypeScript 代码格式化依赖
+$(NODE_BIN)/prettier: package.json pnpm-lock.yaml
+	@echo "Installing Node.js dependencies"
+	@pnpm install --frozen-lockfile
+	@echo "Node.js dependencies install success"
+

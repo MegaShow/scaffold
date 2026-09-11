@@ -1,7 +1,6 @@
 package generator
 
 import (
-	"errors"
 	"fmt"
 	"go/format"
 	"slices"
@@ -196,7 +195,7 @@ func collectGoPathFields(file *File) (map[string][]*Field, []string, error) {
 	used := make(map[string]map[string]bool)
 	for _, service := range file.Services {
 		for _, method := range service.Methods {
-			params, err := collectGoPathParams(file, method)
+			params, err := collectPathParams(file, method)
 			if err != nil {
 				return nil, nil, fmt.Errorf("generator: service %s method %s: %w", service.Name, method.Name, err)
 			}
@@ -228,75 +227,13 @@ func collectGoPathFields(file *File) (map[string][]*Field, []string, error) {
 	return fields, imports, nil
 }
 
-// collectGoPathParams 提取单段路径参数，并校验请求中存在可解码的同名字段。
-func collectGoPathParams(file *File, method *Method) ([]string, error) {
-	var params []string
-	seen := make(map[string]bool)
-	for segment := range strings.SplitSeq(method.Pattern, "/") {
-		if !strings.ContainsAny(segment, "{}") {
-			continue
-		}
-		name, ok := strings.CutPrefix(segment, "{")
-		if !ok {
-			return nil, fmt.Errorf("invalid path parameter %q", segment)
-		}
-		name, ok = strings.CutSuffix(name, "}")
-		if !ok || name == "" || strings.ContainsAny(name, "{}.$") {
-			return nil, fmt.Errorf("unsupported path parameter %q: only {name} is supported", segment)
-		}
-		if seen[name] {
-			return nil, fmt.Errorf("duplicate path parameter %q", name)
-		}
-		seen[name] = true
-		params = append(params, name)
-	}
-	if len(params) == 0 {
-		return nil, nil
-	}
-	if isEmptyType(method.RequestType) {
-		return nil, errors.New("path parameters are not allowed when request type is api.Empty")
-	}
-	if method.RequestType == nil || method.RequestType.Kind != KindMessage || method.RequestType.ImportPath != "" {
-		return nil, errors.New("path parameters require a request message defined in the current file")
-	}
-	var request *Message
-	for _, message := range file.Messages {
-		if message.Name == method.RequestType.Name {
-			request = message
-			break
-		}
-	}
-	if request == nil {
-		return nil, fmt.Errorf("request message %q not found", method.RequestType.Name)
-	}
-	fields := make(map[string]*Field, len(request.Fields))
-	for _, field := range request.Fields {
-		fields[field.Name] = field
-	}
-	for _, name := range params {
-		field := fields[name]
-		if field == nil {
-			return nil, fmt.Errorf("path parameter %q has no matching field in request %s", name, request.Name)
-		}
-		if field.Repeated || field.Type == nil {
-			return nil, fmt.Errorf("path parameter %q must be a scalar or enum field", name)
-		}
-		switch field.Type.Kind {
-		case KindBool, KindInt32, KindInt64, KindUint32, KindUint64, KindFloat32, KindFloat64, KindString, KindBytes, KindEnum:
-		default:
-			return nil, fmt.Errorf("path parameter %q must be a scalar or enum field", name)
-		}
-	}
-	return params, nil
-}
-
 func toTmplGoServiceFile(file *File) (*tmplGoServiceFile, error) {
 	services := make([]*tmplGoService, 0, len(file.Services))
 	imports := collectGoServiceImports(file)
 	for _, service := range file.Services {
 		s := &tmplGoService{Service: service}
 		for _, method := range service.Methods {
-			params, err := collectGoPathParams(file, method)
+			params, err := collectPathParams(file, method)
 			if err != nil {
 				return nil, fmt.Errorf("generator: service %s method %s: %w", service.Name, method.Name, err)
 			}

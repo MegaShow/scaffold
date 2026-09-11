@@ -59,8 +59,8 @@ message Types {
 
 // 全类型示例的枚举。
 enum State {
-  STATE_UNSPECIFIED = 0;
-  STATE_ACTIVE = 1;
+  UNSPECIFIED = 0;
+  ACTIVE = 1;
 }
 
 // 全类型示例的子消息。

@@ -41,7 +41,27 @@ func Test_isEmptyType(t *testing.T) {
 	}
 }
 
-func Test_renderGoComment(t *testing.T) {
+func Test_renderDocComment(t *testing.T) {
+	t.Parallel()
+	testCases := []struct {
+		name string
+		arg  string
+		want string
+	}{
+		{name: "empty", arg: "", want: ""},
+		{name: "whitespace_only", arg: "   ", want: ""},
+		{name: "single_line", arg: "user service", want: "/** user service */"},
+		{name: "single_line_trims_spaces", arg: "  user service  ", want: "/** user service */"},
+		{name: "multi_line", arg: "line one\nline two", want: "/**\n * line one\n * line two\n */"},
+		{name: "multi_line_with_blank_line", arg: "line one\n\nline two", want: "/**\n * line one\n *\n * line two\n */"},
+		{name: "multi_line_strips_one_leading_space", arg: "line one\n  line two", want: "/**\n * line one\n *  line two\n */"},
+	}
+	for _, tt := range testCases {
+		assert.Equal(t, tt.want, renderDocComment(tt.arg), tt.name)
+	}
+}
+
+func Test_renderLineComment(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
 		name string
@@ -57,7 +77,7 @@ func Test_renderGoComment(t *testing.T) {
 		{name: "multi_line_strips_one_leading_space", arg: "line one\n  line two", want: "// line one\n//  line two\n"},
 	}
 	for _, tt := range testCases {
-		assert.Equal(t, tt.want, renderGoComment(tt.arg), tt.name)
+		assert.Equal(t, tt.want, renderLineComment(tt.arg), tt.name)
 	}
 }
 
