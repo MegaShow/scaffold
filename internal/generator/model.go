@@ -62,11 +62,12 @@ type Field struct {
 
 // Type 描述类型。
 type Type struct {
-	Kind       FieldKind // 类型种类
-	Name       string    // 类型名，仅 KindMessage/KindEnum 时有效
-	ImportPath string    // 类型所属包的导入路径，为空表示与生成代码同包
-	MapKey     *Type     // KindMap 的键类型
-	MapElem    *Type     // KindMap 的值类型
+	Kind         FieldKind // 类型种类
+	Name         string    // 类型名，仅 KindMessage/KindEnum 时有效
+	ImportPath   string    // 类型所属包的导入路径，为空表示与生成代码同包
+	OutputPrefix string    // 类型所属 IDL 文件的生成文件前缀
+	MapKey       *Type     // KindMap 的键类型
+	MapElem      *Type     // KindMap 的值类型
 }
 
 // FieldKind 描述字段类型种类，标量种类的取值即对应的 Go 类型名。

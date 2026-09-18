@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path"
 	"strings"
+	"unicode"
 
 	"go.icytown.com/scaffold/internal/template"
 )
@@ -19,6 +20,7 @@ func init() {
 		"renderGoType":      renderGoType,
 		"renderLineComment": renderLineComment,
 		"renderTSType":      renderTSType,
+		"toLowerCamelCase":  toLowerCamelCase,
 		"trimPrefix":        strings.TrimPrefix,
 	})
 }
@@ -217,6 +219,23 @@ func renderTSType(t *Type) string {
 	default:
 		return "unknown"
 	}
+}
+
+// toLowerCamelCase 把导出的标识符按单词转换为 lowerCamelCase。
+func toLowerCamelCase(name string) string {
+	runes := []rune(name)
+	previousUpper := false
+	for i, char := range runes {
+		if !unicode.IsUpper(char) {
+			previousUpper = false
+			continue
+		}
+		if i == 0 || previousUpper && (i+1 == len(runes) || unicode.IsUpper(runes[i+1])) {
+			runes[i] = unicode.ToLower(char)
+		}
+		previousUpper = true
+	}
+	return string(runes)
 }
 
 // versionLines 计算版本注释行：scaffold 自身与各依赖组件按名字长度对齐，组件名列取最长名字对齐后跟一个空格，保证版本号在同一列左对齐。

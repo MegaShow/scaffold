@@ -5,6 +5,14 @@
 {{- end }}
 // source: {{ .Source }}
 
+{{ range .Imports }}
+  import type {
+    {{- range .Names }}
+      {{ . }},
+    {{- end }}
+  } from "{{ .Path }}";
+{{- end }}
+
 {{ range .Enums }}
   {{ renderDocComment .Comment }}
   export enum {{ .Name }} {
@@ -25,7 +33,7 @@
       {{- if .Comment }}
         {{- renderDocComment .Comment }}{{ "\n" }}
       {{- end }}
-      {{- .Name }}: {{ renderTSType .Type }}{{ if .Repeated }}[]{{ end }};
+      {{- .Name }}?: {{ renderTSType .Type }}{{ if .Repeated }}[]{{ end }};
     {{ end -}}
   }
 {{ end }}

@@ -1,0 +1,24 @@
+{
+  "name": "@icytown/scaffold-client",
+  "version": "0.1.0",
+  "description": "TypeScript HTTP client runtime for Scaffold generated services",
+  "type": "module",
+  "types": "./index.ts",
+  "exports": {
+    ".": {
+      "types": "./index.ts",
+      "import": "./index.ts"
+    }
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "Scaffold"
+  ],
+  "author": "MegaShow",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "5.9.3"
+  }
+}

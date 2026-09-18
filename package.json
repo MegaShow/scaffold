@@ -2,7 +2,11 @@
   "name": "scaffold",
   "version": "1.0.0",
   "description": "",
-  "scripts": {},
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "lint": "eslint ."
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
@@ -13,8 +17,16 @@
       "onFail": "download"
     }
   },
-  "type": "module",
   "devDependencies": {
-    "prettier": "3.9.6"
+    "@eslint/js": "^10.0.1",
+    "@icytown/scaffold-client": "workspace:*",
+    "eslint": "^9.39.4",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-import-resolver-typescript": "^4.4.5",
+    "eslint-plugin-import": "^2.32.0",
+    "globals": "^17.12.0",
+    "prettier": "^3.9.7",
+    "typescript": "5.9.3",
+    "typescript-eslint": "^8.70.0"
   }
 }

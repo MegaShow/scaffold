@@ -6,6 +6,137 @@ import (
 	"go.icytown.com/scaffold/internal/assert"
 )
 
+func Test_collectPathParams(t *testing.T) {
+	t.Parallel()
+	apiEmpty := &Type{
+		Kind:       KindMessage,
+		Name:       "Empty",
+		ImportPath: "go.icytown.com/scaffold/internal/gen/api",
+	}
+	testCases := []struct {
+		name    string
+		file    *File
+		method  *Method
+		want    []string
+		wantErr string
+	}{
+		{
+			name:   "without_params",
+			file:   &File{},
+			method: &Method{Pattern: "/users"},
+		},
+		{
+			name: "scalar_and_enum_params",
+			file: &File{Messages: []*Message{{
+				Name: "Request",
+				Fields: []*Field{
+					{Name: "user_id", Type: &Type{Kind: KindInt64}},
+					{Name: "state", Type: &Type{Kind: KindEnum, Name: "State"}},
+				},
+			}}},
+			method: &Method{
+				Pattern:     "/users/{user_id}/{state}",
+				RequestType: &Type{Kind: KindMessage, Name: "Request"},
+			},
+			want: []string{"user_id", "state"},
+		},
+		{
+			name:    "invalid_segment",
+			file:    &File{},
+			method:  &Method{Pattern: "/users/user_id}"},
+			wantErr: `invalid path parameter "user_id}"`,
+		},
+		{
+			name:    "unsupported_segment",
+			file:    &File{},
+			method:  &Method{Pattern: "/users/{user.id}"},
+			wantErr: `unsupported path parameter "{user.id}": only {name} is supported`,
+		},
+		{
+			name:    "duplicate_param",
+			file:    &File{},
+			method:  &Method{Pattern: "/users/{id}/{id}"},
+			wantErr: `duplicate path parameter "id"`,
+		},
+		{
+			name:    "empty_request",
+			file:    &File{},
+			method:  &Method{Pattern: "/users/{id}", RequestType: apiEmpty},
+			wantErr: "path parameters are not allowed when request type is api.Empty",
+		},
+		{
+			name:    "nil_request",
+			file:    &File{},
+			method:  &Method{Pattern: "/users/{id}"},
+			wantErr: "path parameters require a request message defined in the current file",
+		},
+		{
+			name:    "external_request",
+			file:    &File{},
+			method:  &Method{Pattern: "/users/{id}", RequestType: &Type{Kind: KindMessage, Name: "Request", ImportPath: "example.com/api"}},
+			wantErr: "path parameters require a request message defined in the current file",
+		},
+		{
+			name:    "request_not_found",
+			file:    &File{},
+			method:  &Method{Pattern: "/users/{id}", RequestType: &Type{Kind: KindMessage, Name: "Request"}},
+			wantErr: `request message "Request" not found`,
+		},
+		{
+			name: "field_not_found",
+			file: &File{Messages: []*Message{{Name: "Request"}}},
+			method: &Method{
+				Pattern:     "/users/{id}",
+				RequestType: &Type{Kind: KindMessage, Name: "Request"},
+			},
+			wantErr: `path parameter "id" has no matching field in request Request`,
+		},
+		{
+			name: "repeated_field",
+			file: &File{Messages: []*Message{{Name: "Request", Fields: []*Field{{
+				Name: "id", Type: &Type{Kind: KindInt64}, Repeated: true,
+			}}}}},
+			method: &Method{
+				Pattern:     "/users/{id}",
+				RequestType: &Type{Kind: KindMessage, Name: "Request"},
+			},
+			wantErr: `path parameter "id" must be a scalar or enum field`,
+		},
+		{
+			name: "nil_field_type",
+			file: &File{Messages: []*Message{{Name: "Request", Fields: []*Field{{Name: "id"}}}}},
+			method: &Method{
+				Pattern:     "/users/{id}",
+				RequestType: &Type{Kind: KindMessage, Name: "Request"},
+			},
+			wantErr: `path parameter "id" must be a scalar or enum field`,
+		},
+		{
+			name: "message_field",
+			file: &File{Messages: []*Message{{Name: "Request", Fields: []*Field{{
+				Name: "user", Type: &Type{Kind: KindMessage, Name: "User"},
+			}}}}},
+			method: &Method{
+				Pattern:     "/users/{user}",
+				RequestType: &Type{Kind: KindMessage, Name: "Request"},
+			},
+			wantErr: `path parameter "user" must be a scalar or enum field`,
+		},
+	}
+	for _, tt := range testCases {
+		got, err := collectPathParams(tt.file, tt.method)
+		if tt.wantErr == "" {
+			assert.Nil(t, err, tt.name)
+			assert.Equal(t, tt.want, got, tt.name)
+			continue
+		}
+		if !assert.NotNil(t, err, tt.name) {
+			continue
+		}
+		assert.Equal(t, tt.wantErr, err.Error(), tt.name)
+	}
+}
+
 func Test_isEmptyType(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
@@ -179,6 +310,56 @@ func Test_renderGoType(t *testing.T) {
 	}
 	for _, tt := range testCases {
 		assert.Equal(t, tt.want, renderGoType(tt.arg), tt.name)
+	}
+}
+
+func Test_renderTSType(t *testing.T) {
+	t.Parallel()
+	testCases := []struct {
+		name string
+		arg  *Type
+		want string
+	}{
+		{name: "nil", arg: nil, want: "unknown"},
+		{name: "bool", arg: &Type{Kind: KindBool}, want: "boolean"},
+		{name: "int32", arg: &Type{Kind: KindInt32}, want: "number"},
+		{name: "int64", arg: &Type{Kind: KindInt64}, want: "number"},
+		{name: "uint32", arg: &Type{Kind: KindUint32}, want: "number"},
+		{name: "uint64", arg: &Type{Kind: KindUint64}, want: "number"},
+		{name: "float32", arg: &Type{Kind: KindFloat32}, want: "number"},
+		{name: "float64", arg: &Type{Kind: KindFloat64}, want: "number"},
+		{name: "string", arg: &Type{Kind: KindString}, want: "string"},
+		{name: "bytes", arg: &Type{Kind: KindBytes}, want: "Uint8Array"},
+		{name: "enum", arg: &Type{Kind: KindEnum, Name: "State"}, want: "State"},
+		{name: "message", arg: &Type{Kind: KindMessage, Name: "User"}, want: "User"},
+		{name: "map", arg: &Type{
+			Kind:    KindMap,
+			MapKey:  &Type{Kind: KindString},
+			MapElem: &Type{Kind: KindMessage, Name: "User"},
+		}, want: "Record<string, User>"},
+		{name: "unknown", arg: &Type{Kind: FieldKind("unknown")}, want: "unknown"},
+	}
+	for _, tt := range testCases {
+		assert.Equal(t, tt.want, renderTSType(tt.arg), tt.name)
+	}
+}
+
+func Test_toLowerCamelCase(t *testing.T) {
+	t.Parallel()
+	testCases := []struct {
+		name string
+		arg  string
+		want string
+	}{
+		{name: "empty", arg: "", want: ""},
+		{name: "camel_case", arg: "GetUser", want: "getUser"},
+		{name: "initialism", arg: "GetURL", want: "getUrl"},
+		{name: "leading_initialism", arg: "URLValue", want: "urlValue"},
+		{name: "initialism_only", arg: "URL", want: "url"},
+		{name: "multiple_initialisms", arg: "HTTPServerURL", want: "httpServerUrl"},
+	}
+	for _, tt := range testCases {
+		assert.Equal(t, tt.want, toLowerCamelCase(tt.arg), tt.name)
 	}
 }
 

@@ -18,14 +18,14 @@ import (
 func toFile(gen *protogen.Plugin, file *protogen.File) *generator.File {
 	services := make([]*generator.Service, 0, len(file.Services))
 	for _, svc := range file.Services {
-		services = append(services, toService(svc, file))
+		services = append(services, toService(gen, svc, file))
 	}
 	return &generator.File{
 		Path:         file.Desc.Path(),
 		OutputPrefix: file.GeneratedFilenamePrefix,
 		Package:      string(file.GoPackageName),
 		Services:     services,
-		Messages:     collectMessages(file),
+		Messages:     collectMessages(gen, file),
 		Enums:        collectEnums(file),
 		Dependencies: []*generator.Dependency{
 			{Name: "protoc", Version: protocVersion(gen)},
@@ -34,10 +34,10 @@ func toFile(gen *protogen.Plugin, file *protogen.File) *generator.File {
 }
 
 // toService 把 protobuf 服务描述转换为中间模型的服务。
-func toService(svc *protogen.Service, file *protogen.File) *generator.Service {
+func toService(gen *protogen.Plugin, svc *protogen.Service, file *protogen.File) *generator.Service {
 	methods := make([]*generator.Method, 0, len(svc.Methods))
 	for _, m := range svc.Methods {
-		method := toMethod(m, file)
+		method := toMethod(gen, m, file)
 		if method != nil {
 			methods = append(methods, method)
 		}
@@ -51,7 +51,7 @@ func toService(svc *protogen.Service, file *protogen.File) *generator.Service {
 
 // toMethod 把 protobuf 方法描述转换为中间模型的方法，
 // 读取 (api.http) 注解确定 HTTP 方法与路由模式。
-func toMethod(m *protogen.Method, file *protogen.File) *generator.Method {
+func toMethod(gen *protogen.Plugin, m *protogen.Method, file *protogen.File) *generator.Method {
 	httpMethod, pattern := parseHTTPRule(getHTTPRule(m))
 	if httpMethod == "" && pattern == "" {
 		return nil
@@ -61,17 +61,18 @@ func toMethod(m *protogen.Method, file *protogen.File) *generator.Method {
 		Comment:      commentOf(m.Comments),
 		HTTPMethod:   generator.HTTPMethod(httpMethod),
 		Pattern:      pattern,
-		RequestType:  toType(m.Input, file),
-		ResponseType: toType(m.Output, file),
+		RequestType:  toType(gen, m.Input, file),
+		ResponseType: toType(gen, m.Output, file),
 	}
 }
 
 // toType 把 protobuf 消息描述转换为中间模型的类型，
 // 与生成代码同包的类型不携带导入路径。
-func toType(msg *protogen.Message, file *protogen.File) *generator.Type {
+func toType(gen *protogen.Plugin, msg *protogen.Message, file *protogen.File) *generator.Type {
 	t := &generator.Type{
-		Kind: generator.KindMessage,
-		Name: msg.GoIdent.GoName,
+		Kind:         generator.KindMessage,
+		Name:         msg.GoIdent.GoName,
+		OutputPrefix: outputPrefixOf(gen, msg.Desc.ParentFile().Path()),
 	}
 	if msg.GoIdent.GoImportPath != file.GoImportPath {
 		t.ImportPath = string(msg.GoIdent.GoImportPath)
@@ -80,7 +81,7 @@ func toType(msg *protogen.Message, file *protogen.File) *generator.Type {
 }
 
 // collectMessages 递归收集文件内的消息定义（含嵌套消息），跳过 map entry 合成消息。
-func collectMessages(file *protogen.File) []*generator.Message {
+func collectMessages(gen *protogen.Plugin, file *protogen.File) []*generator.Message {
 	var messages []*generator.Message
 	var walk func(msgs []*protogen.Message)
 	walk = func(msgs []*protogen.Message) {
@@ -90,7 +91,7 @@ func collectMessages(file *protogen.File) []*generator.Message {
 			}
 			fields := make([]*generator.Field, 0, len(m.Fields))
 			for _, f := range m.Fields {
-				fields = append(fields, toField(f, file))
+				fields = append(fields, toField(gen, f, file))
 			}
 			messages = append(messages, &generator.Message{
 				Name:    m.GoIdent.GoName,
@@ -137,11 +138,11 @@ func toEnum(e *protogen.Enum) *generator.Enum {
 }
 
 // toField 把 protobuf 字段描述转换为中间模型的字段，字段名保留 IDL 中的原始名字。
-func toField(field *protogen.Field, file *protogen.File) *generator.Field {
+func toField(gen *protogen.Plugin, field *protogen.Field, file *protogen.File) *generator.Field {
 	return &generator.Field{
 		Name:     string(field.Desc.Name()),
 		Comment:  commentOf(field.Comments),
-		Type:     toFieldType(field, file),
+		Type:     toFieldType(gen, field, file),
 		Repeated: field.Desc.IsList(),
 	}
 }
@@ -155,7 +156,7 @@ func commentOf(set protogen.CommentSet) string {
 }
 
 // toFieldType 把 protobuf 字段类型转换为中间模型的字段类型。
-func toFieldType(field *protogen.Field, file *protogen.File) *generator.Type {
+func toFieldType(gen *protogen.Plugin, field *protogen.Field, file *protogen.File) *generator.Type {
 	if field.Desc.IsMap() {
 		// map 字段关联的合成 entry 消息：字段 1 为 key、字段 2 为 value。
 		entry := field.Message
@@ -170,28 +171,43 @@ func toFieldType(field *protogen.Field, file *protogen.File) *generator.Type {
 		}
 		return &generator.Type{
 			Kind:    generator.KindMap,
-			MapKey:  toFieldType(keyField, file),
-			MapElem: toFieldType(valField, file),
+			MapKey:  toFieldType(gen, keyField, file),
+			MapElem: toFieldType(gen, valField, file),
 		}
 	}
 
 	switch field.Desc.Kind() {
 	case protoreflect.MessageKind:
-		return namedFieldType(field.Message.GoIdent, generator.KindMessage, file)
+		return namedFieldType(gen, field.Message.GoIdent, generator.KindMessage, field.Message.Desc.ParentFile().Path(), file)
 	case protoreflect.EnumKind:
-		return namedFieldType(field.Enum.GoIdent, generator.KindEnum, file)
+		return namedFieldType(gen, field.Enum.GoIdent, generator.KindEnum, field.Enum.Desc.ParentFile().Path(), file)
 	default:
 		return &generator.Type{Kind: scalarKindMap[field.Desc.Kind()]}
 	}
 }
 
 // namedFieldType 构造引用命名类型的字段类型，与生成代码同包时不携带导入路径。
-func namedFieldType(id protogen.GoIdent, kind generator.FieldKind, file *protogen.File) *generator.Type {
-	t := &generator.Type{Kind: kind, Name: id.GoName}
+func namedFieldType(
+	gen *protogen.Plugin,
+	id protogen.GoIdent,
+	kind generator.FieldKind,
+	sourcePath string,
+	file *protogen.File,
+) *generator.Type {
+	t := &generator.Type{Kind: kind, Name: id.GoName, OutputPrefix: outputPrefixOf(gen, sourcePath)}
 	if id.GoImportPath != file.GoImportPath {
 		t.ImportPath = string(id.GoImportPath)
 	}
 	return t
+}
+
+// outputPrefixOf 返回声明文件对应的生成文件前缀。
+func outputPrefixOf(gen *protogen.Plugin, sourcePath string) string {
+	file := gen.FilesByPath[sourcePath]
+	if file == nil {
+		return ""
+	}
+	return file.GeneratedFilenamePrefix
 }
 
 // scalarKindMap 把 protobuf 标量类型映射为中间模型类型种类。

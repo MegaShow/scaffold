@@ -4,12 +4,13 @@
 // 	protoc   v7.35.1
 // source: test.proto
 
-package dev
+package gen
 
 import (
 	"net/http"
 	"net/url"
 
+	"go.icytown.com/scaffold/example/dev/gen/other"
 	"go.icytown.com/scaffold/mux/conv"
 	"go.icytown.com/scaffold/mux/form"
 	"go.icytown.com/scaffold/mux/path"
@@ -47,8 +48,10 @@ func (v *Request) DecodeForm(values url.Values) error {
 	return d.Err()
 }
 
-// 开发调试响应。
+// 开发调试响应，覆盖同包与跨包消息引用。
 type Response struct {
+	SamePackageMessage  *SharedMessage      `json:"same_package_message"`
+	OtherPackageMessage *other.OtherMessage `json:"other_package_message"`
 }
 
 // 覆盖所有 protobuf 基础类型，以及枚举、数组、子消息和映射。

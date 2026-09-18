@@ -1,0 +1,10 @@
+edition = "2024";
+
+package dev.other;
+
+option go_package = "go.icytown.com/scaffold/example/dev/gen/other";
+
+// 与 test.proto 属于不同包的消息。
+message OtherMessage {
+  string value = 1;
+}

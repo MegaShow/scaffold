@@ -47,13 +47,14 @@ gen-api: $(BIN)/protoc $(BIN)/protoc-gen-go
 # 生成 example 演示代码
 gen-example: build-dev $(BIN)/protoc $(NODE_BIN)/prettier
 	@echo "Generate example source code"
-	@mkdir -p ./example/dev
+	@mkdir -p ./example/dev/gen
 	@mkdir -p ./example/test/gen
 	@mkdir -p ./example/go-server/gen
 	@mkdir -p ./example/ts-client/gen
-	@cd ./example/dev && $(BIN)/protoc-gen-scaffold -protoc=$(BIN)/protoc -lang=go -kind=server test.proto
-	@cd ./example/dev && $(BIN)/protoc-gen-scaffold -protoc=$(BIN)/protoc -lang=typescript -kind=client \
-		-format=prettier -prettier=$(NODE_BIN)/prettier test.proto
+	@cd ./example/dev && $(BIN)/protoc-gen-scaffold -protoc=$(BIN)/protoc -out=./gen -lang=go -kind=server \
+		test.proto shared.proto other/other.proto
+	@cd ./example/dev && $(BIN)/protoc-gen-scaffold -protoc=$(BIN)/protoc -out=./gen -lang=typescript -kind=client \
+		-format=prettier -prettier=$(NODE_BIN)/prettier test.proto shared.proto other/other.proto
 	@cd ./example/test && $(BIN)/protoc-gen-scaffold -protoc=$(BIN)/protoc -out=./gen -lang=go -kind=server user.proto
 	@cd ./example && $(BIN)/protoc-gen-scaffold -protoc=$(BIN)/protoc -out=./go-server/gen -lang=go -kind=server user.proto
 	@cd ./example && $(BIN)/protoc-gen-scaffold -protoc=$(BIN)/protoc -out=./ts-client/gen -lang=typescript -kind=client \
@@ -61,23 +62,27 @@ gen-example: build-dev $(BIN)/protoc $(NODE_BIN)/prettier
 	@echo "Generate example source code success"
 
 
-# 检查 assert 目录一致性并 lint 主模块和 mux 模块
+# 检查 assert 目录一致性并 lint 主模块、mux 模块和 example 模块
 lint:
 	@echo "Checking assert consistency"
-	@diff -ru internal/assert mux/internal/assert
+	@diff -ru internal/assert go/mux/internal/assert
 	@echo "Linting scaffold"
 	@golangci-lint run ./...
 	@echo "Linting mux"
-	@cd mux && golangci-lint run ./...
+	@cd go/mux && golangci-lint run ./...
+	@echo "Linting example"
+	@cd example && golangci-lint run ./...
 	@echo "Lint success"
 
 
-# 测试主模块和 mux 模块
+# 测试主模块、mux 模块和 example 模块
 test:
 	@echo "Testing scaffold"
 	@go test -race ./...
 	@echo "Testing mux"
-	@cd mux && go test -race ./...
+	@cd go/mux && go test -race ./...
+	@echo "Testing example"
+	@cd example && go test -race ./...
 	@echo "Test success"
 
 
@@ -146,4 +151,3 @@ $(NODE_BIN)/prettier: package.json pnpm-lock.yaml
 	@echo "Installing Node.js dependencies"
 	@pnpm install --frozen-lockfile
 	@echo "Node.js dependencies install success"
-

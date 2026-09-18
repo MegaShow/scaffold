@@ -8,8 +8,8 @@ AI 编码代理在本仓库工作时的约定，对人类开发者同样适用�
 - `internal/generator` — 协议无关的生成器与中间模型
 - `internal/template` — 代码模板
 - `internal/gen/api` — `api/api.proto` 的生成产物，禁止手改
-- `mux/` — 独立 Go 模块（自带 go.mod）的 HTTP 路由库
-- `example/` — 演示项目
+- `go/mux/` — 独立 Go 模块（自带 go.mod）的 HTTP 路由库
+- `example/` — 独立 Go 模块的演示项目，包含 Web 框架集成测试
 
 ## 常用命令
 
@@ -19,9 +19,15 @@ AI 编码代理在本仓库工作时的约定，对人类开发者同样适用�
 | 重新生成 `internal/gen/api` | `make gen-api`     |
 | 重新生成 example 演示代码   | `make gen-example` |
 | Lint                        | `make lint`        |
-| 测试主模块和 mux 模块       | `make test`        |
+| 测试所有 Go 模块            | `make test`        |
 
 在 Windows 下执行 make 命令时需要使用 Git Bash 进行。
+
+## 依赖工具配置
+
+- 禁止修改或显式指定 Go、Node.js 及相关依赖工具的环境、缓存、镜像或全局配置，包括但不限于 `GOCACHE`、`GOMODCACHE`、`GOPATH`、`GOENV`、`NODE_PATH` 以及 npm、pnpm、yarn 的 cache、store、registry 配置。
+- 必须使用用户与运行环境已有的默认配置；默认配置因权限、网络或其他原因不可用时，立即停止相关操作并向用户报告，禁止自行改用仓库目录、临时目录或其他路径。
+- 本约束不限制按任务要求维护项目自身的依赖清单与锁文件，例如 `go.mod`、`go.sum`、`package.json` 和 `pnpm-lock.yaml`。
 
 ## 验证代码生成
 
@@ -46,7 +52,7 @@ AI 编码代理在本仓库工作时的约定，对人类开发者同样适用�
 
 ### assert 断言库
 
-`internal/assert` 与 `mux/internal/assert` 是同一份代码的两份拷贝（因 mux 是独立 Go 模块，无法导入主模块的 internal 包）。修改任一份时必须同步修改另一份，保持两个文件内容完全一致。
+`internal/assert` 与 `go/mux/internal/assert` 是同一份代码的两份拷贝（因 mux 是独立 Go 模块，无法导入主模块的 internal 包）。修改任一份时必须同步修改另一份，保持两个文件内容完全一致。
 
 ## Git 操作约束
 

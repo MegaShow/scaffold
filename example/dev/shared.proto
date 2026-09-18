@@ -1,0 +1,10 @@
+edition = "2024";
+
+package dev;
+
+option go_package = "go.icytown.com/scaffold/example/dev/gen";
+
+// 与 test.proto 属于同一个包的消息。
+message SharedMessage {
+  string value = 1;
+}

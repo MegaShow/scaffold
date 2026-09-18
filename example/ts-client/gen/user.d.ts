@@ -5,10 +5,10 @@
 // source: user.proto
 
 export interface GetUserRequest {
-  user_id: string;
+  user_id?: string;
 }
 
 export interface GetUserResponse {
-  user_id: string;
-  name: string;
+  user_id?: string;
+  name?: string;
 }

@@ -1,7 +1,11 @@
 {
   "editor.formatOnSave": true,
-  "editor.codeActionsOnSave": {},
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
   "editor.rulers": [120],
+
+  "eslint.validate": ["javascript", "typescript"],
 
   "go.lintTool": "golangci-lint-v2",
   "go.lintFlags": ["--path-mode=abs", "--fast-only"],
@@ -9,5 +13,14 @@
   "go.alternateTools": {
     "customFormatter": "golangci-lint-v2"
   },
-  "go.formatFlags": ["fmt", "--stdin"]
+  "go.formatFlags": ["fmt", "--stdin"],
+
+  "[javascript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.tabSize": 2
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.tabSize": 2
+  }
 }

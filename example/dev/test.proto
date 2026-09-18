@@ -2,17 +2,22 @@ edition = "2024";
 
 package dev;
 
-option go_package = "go.icytown.com/scaffold/example/dev";
+option go_package = "go.icytown.com/scaffold/example/dev/gen";
 
 import "api/api.proto";
+import "other/other.proto";
+import "shared.proto";
 
 // 开发调试请求，用于查看和调试各类型的表单解码。
 message Request {
   Types types = 1;
 }
 
-// 开发调试响应。
-message Response {}
+// 开发调试响应，覆盖同包与跨包消息引用。
+message Response {
+  SharedMessage same_package_message = 1;
+  dev.other.OtherMessage other_package_message = 2;
+}
 
 // 覆盖所有 protobuf 基础类型，以及枚举、数组、子消息和映射。
 message Types {

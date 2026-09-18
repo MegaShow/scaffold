@@ -1,0 +1,4 @@
+packages:
+  - 'typescript/client'
+allowBuilds:
+  unrs-resolver: false

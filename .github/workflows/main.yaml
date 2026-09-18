@@ -7,31 +7,7 @@ on:
     branches: ["master"]
 
 jobs:
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-      - name: Setup Go
-        uses: actions/setup-go@v7
-        with:
-          go-version: "stable"
-      - name: Lint Scaffold
-        uses: golangci/golangci-lint-action@v9
-      - name: Lint Mux
-        uses: golangci/golangci-lint-action@v9
-        with:
-          working-directory: mux
-
-  sync-check:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-      - name: Check Assert Consistency
-        run: diff -ru internal/assert mux/internal/assert
-
-  example-test:
+  gen-example:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -49,6 +25,34 @@ jobs:
       - name: Gen Example
         run: make gen-example
 
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Setup Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: "stable"
+      - name: Lint Scaffold
+        uses: golangci/golangci-lint-action@v9
+      - name: Lint Mux
+        uses: golangci/golangci-lint-action@v9
+        with:
+          working-directory: go/mux
+      - name: Lint Example
+        uses: golangci/golangci-lint-action@v9
+        with:
+          working-directory: example
+
+  sync-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Check Assert Consistency
+        run: diff -ru internal/assert go/mux/internal/assert
+
   test:
     runs-on: ubuntu-latest
     strategy:
@@ -64,13 +68,16 @@ jobs:
       - name: Test Scaffold
         run: go test ./... -race -coverprofile=coverage-scaffold.out
       - name: Test Mux
-        run: go test ./... -race -coverprofile=../coverage-mux.out
-        working-directory: mux
+        run: go test ./... -race -coverprofile=../../coverage-mux.out
+        working-directory: go/mux
+      - name: Test Example
+        run: go test ./... -race -coverprofile=../coverage-example.out
+        working-directory: example
       - name: Codecov
         uses: codecov/codecov-action@v7
         if: ${{ matrix.go-version }} == 'stable'
         with:
           fail_ci_if_error: true
-          files: ./coverage-scaffold.out,./coverage-mux.out
+          files: ./coverage-scaffold.out,./coverage-mux.out,./coverage-example.out
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
