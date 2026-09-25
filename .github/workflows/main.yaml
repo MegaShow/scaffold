@@ -2,9 +2,9 @@ name: Test
 
 on:
   push:
-    branches: ["master"]
+    branches: ['master']
   pull_request:
-    branches: ["master"]
+    branches: ['master']
 
 jobs:
   gen-example:
@@ -15,7 +15,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v7
         with:
-          go-version: "stable"
+          go-version: 'stable'
       - name: Setup pnpm
         uses: pnpm/setup@v2
         with:
@@ -25,7 +25,7 @@ jobs:
       - name: Gen Example
         run: make gen-example
 
-  lint:
+  lint-go:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -33,7 +33,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v7
         with:
-          go-version: "stable"
+          go-version: 'stable'
       - name: Lint Scaffold
         uses: golangci/golangci-lint-action@v9
       - name: Lint Mux
@@ -45,6 +45,22 @@ jobs:
         with:
           working-directory: example
 
+  lint-typescript:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Setup pnpm
+        uses: pnpm/setup@v2
+        with:
+          runtime: node@lts
+          cache: true
+          install: false
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Lint TypeScript
+        run: pnpm run lint
+
   sync-check:
     runs-on: ubuntu-latest
     steps:
@@ -53,11 +69,11 @@ jobs:
       - name: Check Assert Consistency
         run: diff -ru internal/assert go/mux/internal/assert
 
-  test:
+  test-go:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go-version: ["stable"]
+        go-version: ['stable']
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -79,5 +95,30 @@ jobs:
         with:
           fail_ci_if_error: true
           files: ./coverage-scaffold.out,./coverage-mux.out,./coverage-example.out
+          flags: go
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  test-typescript:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Setup pnpm
+        uses: pnpm/setup@v2
+        with:
+          runtime: node@lts
+          cache: true
+          install: false
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Test TypeScript
+        run: pnpm run test:coverage
+      - name: Codecov
+        uses: codecov/codecov-action@v7
+        with:
+          fail_ci_if_error: true
+          files: ./coverage-typescript.info
+          flags: typescript
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}

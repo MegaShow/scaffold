@@ -1,11 +1,11 @@
 import js from '@eslint/js';
-import { defineConfig } from 'eslint/config';
+import { defineConfig, globalIgnores } from 'eslint/config';
 import prettier from 'eslint-config-prettier';
 import importPlugin from 'eslint-plugin-import';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
-export default defineConfig({
+export default defineConfig(globalIgnores(['**/dist/**']), {
   extends: [
     js.configs.recommended,
     tseslint.configs.recommendedTypeChecked,
@@ -15,7 +15,6 @@ export default defineConfig({
     prettier,
   ],
   files: ['**/*.{ts,tsx}'],
-  ignores: ['dist'],
   languageOptions: {
     ecmaVersion: 'latest',
     sourceType: 'module',

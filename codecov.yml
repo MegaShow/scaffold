@@ -1,0 +1,8 @@
+coverage:
+  flags:
+    # Go 主模块、go/mux 与 example 三个模块的单测覆盖率
+    go:
+      carryforward: true
+    # TypeScript 客户端的单测覆盖率
+    typescript:
+      carryforward: true

@@ -65,6 +65,7 @@ func (b0 Empty_builder) Build() *Empty {
 	return m0
 }
 
+// HTTP 接口配置。
 type HttpRule struct {
 	state                  protoimpl.MessageState `protogen:"opaque.v1"`
 	xxx_hidden_Get         *string                `protobuf:"bytes,1,opt,name=get"`

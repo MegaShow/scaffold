@@ -182,9 +182,10 @@ func validateFormat() error {
 func ensureApiProto(selfDir string) error {
 	apiDir := filepath.Join(selfDir, "api")
 	target := filepath.Join(apiDir, "api.proto")
+	content := apiProtoContent()
 
 	if existing, err := os.ReadFile(target); err == nil { //nolint:gosec // target 由 os.Executable() 目录拼接固定子路径得到，非用户输入
-		if bytes.Equal(existing, api.Proto) {
+		if bytes.Equal(existing, content) {
 			return nil
 		}
 	} else if !os.IsNotExist(err) {
@@ -194,10 +195,18 @@ func ensureApiProto(selfDir string) error {
 	if err := os.MkdirAll(apiDir, 0o750); err != nil {
 		return fmt.Errorf("create api dir %s: %w", apiDir, err)
 	}
-	if err := os.WriteFile(target, api.Proto, 0o600); err != nil {
+	if err := os.WriteFile(target, content, 0o600); err != nil {
 		return fmt.Errorf("write %s: %w", target, err)
 	}
 	return nil
+}
+
+// apiProtoContent 返回包含当前生成器版本的 API IDL 内容。
+func apiProtoContent() []byte {
+	header := fmt.Sprintf("// Scaffold API version: %s\n\n", generator.Version())
+	content := make([]byte, 0, len(header)+len(api.Proto))
+	content = append(content, header...)
+	return append(content, api.Proto...)
 }
 
 // generateFile 把单个 protobuf 文件转换为中间模型并生成脚手架代码，

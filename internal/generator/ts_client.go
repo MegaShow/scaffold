@@ -160,14 +160,15 @@ func toTmplTSServiceFile(file *File) (*tmplTSServiceFile, error) {
 		return strings.Compare(a.Name, b.Name)
 	})
 
-	imports := []*tmplTSImport{{
-		Path:  "@icytown/scaffold-client",
-		Names: []string{"Client"},
-	}}
 	typeImports, err := collectTSImports(file.OutputPrefix, true, types...)
 	if err != nil {
 		return nil, err
 	}
+	imports := make([]*tmplTSImport, 0, 1+len(typeImports))
+	imports = append(imports, &tmplTSImport{
+		Path:  "@icytown/scaffold-client",
+		Names: []string{"Client"},
+	})
 	imports = append(imports, typeImports...)
 	slices.SortFunc(imports, func(a, b *tmplTSImport) int {
 		return strings.Compare(a.Path, b.Path)

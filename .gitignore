@@ -3,6 +3,11 @@
 
 # Binary
 /bin/
+/typescript/client/dist/
+
+# Coverage
+coverage-*.out
+coverage-*.info
 
 # Node
 node_modules/
