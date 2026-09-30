@@ -5,7 +5,7 @@ NODE_BIN = $(CURDIR)/node_modules/.bin
 
 # 依赖版本
 # https://github.com/protocolbuffers/protobuf
-PROTOC_VERSION := 35.1
+PROTOC_VERSION := 36.2
 # https://github.com/protocolbuffers/protobuf-go
 PROTOC_GEN_GO_VERSION := 1.36.12
 
@@ -62,7 +62,7 @@ gen-example: build-dev $(BIN)/protoc $(NODE_BIN)/prettier
 	@echo "Generate example source code success"
 
 
-# 检查 assert 目录一致性并 lint 主模块、mux 模块和 example 模块
+# 检查 assert 目录一致性并 lint
 lint:
 	@echo "Checking assert consistency"
 	@diff -ru internal/assert go/mux/internal/assert
@@ -70,17 +70,21 @@ lint:
 	@golangci-lint run ./...
 	@echo "Linting go/mux"
 	@cd go/mux && golangci-lint run ./...
+	@echo "Linting typescript"
+	@pnpm run lint
 	@echo "Linting example"
 	@cd example && golangci-lint run ./...
 	@echo "Lint success"
 
 
-# 测试主模块、mux 模块和 example 模块
+# 测试
 test:
 	@echo "Testing scaffold"
 	@go test -race ./...
-	@echo "Testing mux"
+	@echo "Testing go/mux"
 	@cd go/mux && go test -race ./...
+	@echo "Testing typescript"
+	@pnpm run test
 	@echo "Testing example"
 	@cd example && go test -race ./...
 	@echo "Test success"

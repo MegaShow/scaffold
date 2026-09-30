@@ -81,7 +81,7 @@ Golang 标准库的 ServeMux 默认已实现 mux.Mux 接口，仅需要按以下
 
 ```go
 serveMux := http.NewServeMux()
-parser := &mux.AdaptParser{Form: &mux.FormParser{}, JSON: &mux.JSONParser{}}
+parser := &mux.AdaptParser{}
 renderer := &mux.JSONRenderer{}
 gen.RegisterUserService(serveMux, &ServiceImpl{}, parser, renderer)
 
@@ -108,7 +108,7 @@ func (m *ChiMux) HandleFunc(pattern string, handler func(http.ResponseWriter, *h
 
 ```go
 router := &ChiMux{Router: chi.NewRouter()}
-parser := &mux.AdaptParser{Form: &mux.FormParser{}, JSON: &mux.JSONParser{}}
+parser := &mux.AdaptParser{}
 renderer := &mux.JSONRenderer{}
 gen.RegisterUserService(router, &ServiceImpl{}, parser, renderer)
 
@@ -145,7 +145,7 @@ func (m *GinMux) HandleFunc(pattern string, handler func(http.ResponseWriter, *h
 
 ```go
 router := &GinMux{Engine: gin.Default()}
-parser := &mux.AdaptParser{Form: &mux.FormParser{}, JSON: &mux.JSONParser{}}
+parser := &mux.AdaptParser{}
 renderer := &mux.JSONRenderer{}
 gen.RegisterUserService(router, &ServiceImpl{}, parser, renderer)
 

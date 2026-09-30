@@ -2,9 +2,19 @@
   "name": "@icytown/scaffold-client",
   "version": "0.1.0",
   "description": "TypeScript HTTP client runtime for Scaffold generated services",
+  "homepage": "https://github.com/megashow/scaffold#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/megashow/scaffold.git",
+    "directory": "typescript/client"
+  },
+  "bugs": {
+    "url": "https://github.com/megashow/scaffold/issues"
+  },
   "type": "module",
   "files": [
-    "dist"
+    "dist",
+    "src"
   ],
   "types": "./dist/index.d.ts",
   "exports": {
@@ -15,7 +25,11 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "prepack": "pnpm run build",
     "typecheck": "tsc -p tsconfig.build.json && tsc --noEmit -p tsconfig.json"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "keywords": [
     "Scaffold"

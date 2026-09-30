@@ -57,7 +57,7 @@ func (s *ServiceImpl) GetUser(ctx context.Context, req *gen.GetUserRequest) (*ge
 
 func createServeMux() *http.ServeMux {
 	serveMux := http.NewServeMux()
-	parser := &mux.AdaptParser{Form: &mux.FormParser{}, JSON: &mux.JSONParser{}}
+	parser := &mux.AdaptParser{}
 	renderer := &mux.JSONRenderer{}
 	gen.RegisterUserService(serveMux, &ServiceImpl{}, parser, renderer)
 	return serveMux

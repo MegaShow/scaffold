@@ -48,16 +48,29 @@ export default defineConfig(globalIgnores(['**/dist/**']), {
       'error',
       {
         groups: ['builtin', ['external', 'internal'], ['parent', 'sibling', 'index'], ['object', 'type', 'unknown']],
+        sortTypesGroup: true,
         'newlines-between': 'always',
+        'newlines-between-types': 'never',
         alphabetize: { order: 'asc', orderImportKind: 'asc' },
       },
     ],
 
+    '@typescript-eslint/no-floating-promises': [
+      'error',
+      {
+        allowForKnownSafeCalls: [{ from: 'package', package: 'node:test', name: ['describe', 'it', 'suite', 'test'] }],
+      },
+    ],
     '@typescript-eslint/no-misused-promises': ['error', { checksVoidReturn: false }],
   },
   settings: {
     'import/resolver': {
-      typescript: true,
+      typescript: {
+        project: [
+          `${import.meta.dirname}/example/tsconfig.json`,
+          `${import.meta.dirname}/typescript/client/tsconfig.json`,
+        ],
+      },
       node: true,
     },
   },

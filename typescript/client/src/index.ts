@@ -1,3 +1,4 @@
+import { AxiosClient, type AxiosInstance } from './axios.ts';
 import {
   type Client,
   HTTPError,
@@ -8,7 +9,20 @@ import {
   type Response,
 } from './client.ts';
 import { AdaptComposer, FormComposer, JsonComposer, type RequestComposer } from './composer.ts';
+import { FetchClient, type FetchClientOptions } from './fetch.ts';
 import { JsonResolver, type ResponseResolver } from './resolver.ts';
 
-export { AdaptComposer, FormComposer, HTTPError, JsonComposer, JsonResolver };
-export type { Client, HeaderValue, Method, QueryValue, Request, RequestComposer, Response, ResponseResolver };
+export type {
+  AxiosInstance,
+  Client,
+  FetchClientOptions,
+  HeaderValue,
+  Method,
+  QueryValue,
+  Request,
+  RequestComposer,
+  Response,
+  ResponseResolver,
+};
+
+export { AdaptComposer, AxiosClient, FetchClient, FormComposer, HTTPError, JsonComposer, JsonResolver };

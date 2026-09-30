@@ -1,6 +1,7 @@
 package mux
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -10,6 +11,14 @@ import (
 	"go.icytown.com/scaffold/mux/form"
 	"go.icytown.com/scaffold/mux/internal/assert"
 )
+
+type failingParser struct {
+	err error
+}
+
+func (p failingParser) Parse(*http.Request, any) error {
+	return p.err
+}
 
 type request struct {
 	Name string   `json:"name"`
@@ -27,6 +36,31 @@ func (v *request) DecodeForm(values url.Values) error {
 
 func TestAdaptParser_Parse(t *testing.T) {
 	t.Parallel()
+	t.Run("custom_and_default_parsers", func(t *testing.T) {
+		customError := errors.New("custom parser failed")
+		custom := failingParser{err: customError}
+		for _, p := range []*AdaptParser{{Form: custom}, {JSON: custom}, {Form: custom, JSON: custom}} {
+			for _, contentType := range []string{"application/x-www-form-urlencoded", "application/json"} {
+				body := "name=Alice"
+				configured := p.Form
+				if contentType == "application/json" {
+					body = `{"name":"Alice"}`
+					configured = p.JSON
+				}
+				r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/", strings.NewReader(body))
+				r.Header.Set("Content-Type", contentType)
+				var target request
+				err := p.Parse(r, &target)
+				if configured != nil {
+					assert.Equal(t, customError, err)
+				} else {
+					assert.Nil(t, err)
+					assert.Equal(t, "Alice", target.Name)
+				}
+			}
+		}
+	})
+
 	testCases := []struct {
 		name        string
 		method      string

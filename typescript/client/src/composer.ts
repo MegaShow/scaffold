@@ -8,15 +8,15 @@ export interface RequestComposer {
 }
 
 /**
- * 根据请求方法和 Content-Type 选择请求组装器
+ * 根据请求方法和 Content-Type 选择请求组装器，未指定时使用 FormComposer 和 JsonComposer
  */
 export class AdaptComposer implements RequestComposer {
   readonly form: RequestComposer;
   readonly json: RequestComposer;
 
-  constructor(config: { form: RequestComposer; json: RequestComposer }) {
-    this.form = config.form;
-    this.json = config.json;
+  constructor(config: { form?: RequestComposer; json?: RequestComposer } = {}) {
+    this.form = config.form ?? new FormComposer();
+    this.json = config.json ?? new JsonComposer();
   }
 
   compose(request: Request, value: unknown): void {

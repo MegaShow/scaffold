@@ -17,17 +17,56 @@
   {{- renderDocComment .Comment }}
   export class {{ .Name }} {
     readonly #client: Client;
+    readonly #composer: RequestComposer;
+    readonly #resolver: ResponseResolver;
 
-    constructor(client: Client) {
+    constructor(client: Client, options: { composer: RequestComposer; resolver: ResponseResolver }) {
       this.#client = client;
+      this.#composer = options.composer;
+      this.#resolver = options.resolver;
     }
 
     {{ range .Methods }}
       {{ renderDocComment .Comment }}
       async {{ toLowerCamelCase .Name }}(
-        {{- if not (isEmptyType .RequestType) }}req: {{ renderTSType .RequestType }}{{ end -}}
-      ): Promise<{{ if isEmptyType .ResponseType }}void{{ else }}{{ renderTSType .ResponseType }}{{ end }}> {
-        return {{ if not (isEmptyType .ResponseType) }}{}{{ end }};
+        {{- if not (isEmptyType .RequestType) }}req: {{ renderTSType .RequestType $.Aliases }}{{ end -}}
+      ): Promise<{{ if isEmptyType .ResponseType }}void{{ else }}{{ renderTSType .ResponseType $.Aliases }} | undefined{{ end }}> {
+        {{- range .PathParams }}
+          if (req.{{ .Name }} === undefined) {
+            throw new TypeError({{ printf "%q" (printf "Missing path parameter: %s" .Name) }});
+          }
+        {{- end }}
+        const request: Request = {
+          method: {{ printf "%q" .HTTPMethod }},
+          path: {{ printf "%q" .Pattern }}
+          {{- range .PathParams }}
+            .replace({{ printf "%q" (printf "{%s}" .Name) }}, encodeURIComponent(
+              {{- if eq .Type.Kind "bytes" -}}
+                new TextDecoder('utf-8', { fatal: true }).decode(req.{{ .Name }})
+              {{- else -}}
+                String(req.{{ .Name }})
+              {{- end -}}
+            ))
+          {{- end }},
+          headers: { Accept: 'application/json', {{ if ne .HTTPMethod "GET" }}'Content-Type': 'application/json'{{ end }} },
+        };
+        {{- if not (isEmptyType .RequestType) }}
+          {{- if .PathParams }}
+            const data = { ...req };
+            {{- range .PathParams }}
+              delete data.{{ .Name }};
+            {{- end }}
+            this.#composer.compose(request, data);
+          {{- else }}
+            this.#composer.compose(request, req);
+          {{- end }}
+        {{- end }}
+        const response = await this.#client.request(request);
+        {{- if isEmptyType .ResponseType }}
+          this.#resolver.resolve<void>(response);
+        {{- else }}
+          return this.#resolver.resolve<{{ renderTSType .ResponseType $.Aliases }}>(response);
+        {{- end }}
       }
     {{ end }}
   }

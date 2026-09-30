@@ -111,10 +111,11 @@ func toTmplTSMessageFile(file *File) (*tmplTSMessageFile, error) {
 
 // tmplTSServiceFile 是 TypeScript 服务客户端文件的模板数据。
 type tmplTSServiceFile struct {
-	Source   string           // 源文件路径
-	Versions []string         // 版本注释行
-	Imports  []*tmplTSImport  // TypeScript 类型导入，导入名字按字典序排列
-	Services []*tmplTSService // 服务列表，按名字字典序排列
+	Source   string               // 源文件路径
+	Versions []string             // 版本注释行
+	Imports  []*tmplTSImport      // TypeScript 类型导入，导入名字按字典序排列
+	Services []*tmplTSService     // 服务列表，按名字字典序排列
+	Aliases  map[[2]string]string // 按模块路径和原类型名记录的导入别名
 }
 
 // tmplTSImport 描述一条 TypeScript 类型导入。
@@ -132,7 +133,7 @@ type tmplTSService struct {
 // tmplTSMethod 是 TypeScript 服务方法的模板数据。
 type tmplTSMethod struct {
 	*Method
-	PathParams []string // 路径参数名
+	PathParams []*Field // 按路由顺序排列的路径参数字段
 }
 
 func toTmplTSServiceFile(file *File) (*tmplTSServiceFile, error) {
@@ -160,25 +161,58 @@ func toTmplTSServiceFile(file *File) (*tmplTSServiceFile, error) {
 		return strings.Compare(a.Name, b.Name)
 	})
 
-	typeImports, err := collectTSImports(file.OutputPrefix, true, types...)
+	imports, err := collectTSImports(file.OutputPrefix, true, types...)
 	if err != nil {
 		return nil, err
 	}
-	imports := make([]*tmplTSImport, 0, 1+len(typeImports))
-	imports = append(imports, &tmplTSImport{
-		Path:  "@icytown/scaffold-client",
-		Names: []string{"Client"},
-	})
-	imports = append(imports, typeImports...)
-	slices.SortFunc(imports, func(a, b *tmplTSImport) int {
-		return strings.Compare(a.Path, b.Path)
-	})
 
+	// 通用类型保留原名，业务导入冲突时追加下划线，并避开已有业务名字
+	used := map[string]bool{"Client": true, "Request": true, "Response": true, "RequestComposer": true, "ResponseResolver": true}
+	occupied := make(map[string]bool)
+	for _, service := range services {
+		used[service.Name] = true
+	}
+	for _, imp := range imports {
+		for _, name := range imp.Names {
+			occupied[name] = true
+		}
+	}
+	aliases := make(map[[2]string]string)
+	for _, imp := range imports {
+		module := filepath.ToSlash(filepath.Join(filepath.Dir(file.OutputPrefix), imp.Path))
+		for i, name := range imp.Names {
+			local := name
+			if used[local] {
+				for local += "_"; used[local] || occupied[local]; local += "_" {
+				}
+				imp.Names[i] = name + " as " + local
+			}
+			used[local] = true
+			aliases[[2]string{module, name}] = local
+			if module == filepath.ToSlash(filepath.Clean(file.OutputPrefix)) {
+				aliases[[2]string{"", name}] = local
+			}
+		}
+		slices.SortFunc(imp.Names, func(a, b string) int {
+			if _, alias, ok := strings.Cut(a, " as "); ok {
+				a = alias
+			}
+			if _, alias, ok := strings.Cut(b, " as "); ok {
+				b = alias
+			}
+			return strings.Compare(a, b)
+		})
+	}
+	imports = append([]*tmplTSImport{{
+		Path:  "@icytown/scaffold-client",
+		Names: []string{"Client", "Request", "RequestComposer", "ResponseResolver"},
+	}}, imports...)
 	return &tmplTSServiceFile{
 		Source:   file.Path,
 		Versions: versionLines(file),
 		Imports:  imports,
 		Services: services,
+		Aliases:  aliases,
 	}, nil
 }
 

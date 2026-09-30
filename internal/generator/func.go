@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"path/filepath"
 	"strings"
 	"unicode"
 
@@ -25,8 +26,8 @@ func init() {
 	})
 }
 
-// collectPathParams 提取路由 Pattern 中的单段路径参数名，并校验请求消息存在同名的标量或枚举字段。
-func collectPathParams(file *File, method *Method) ([]string, error) {
+// collectPathParams 按路由顺序提取单段路径参数对应的字段，并校验字段为标量或枚举
+func collectPathParams(file *File, method *Method) ([]*Field, error) {
 	var params []string
 	seen := make(map[string]bool)
 	for segment := range strings.SplitSeq(method.Pattern, "/") {
@@ -70,6 +71,7 @@ func collectPathParams(file *File, method *Method) ([]string, error) {
 	for _, field := range request.Fields {
 		fields[field.Name] = field
 	}
+	pathFields := make([]*Field, 0, len(params))
 	for _, name := range params {
 		field := fields[name]
 		if field == nil {
@@ -83,8 +85,9 @@ func collectPathParams(file *File, method *Method) ([]string, error) {
 		default:
 			return nil, fmt.Errorf("path parameter %q must be a scalar or enum field", name)
 		}
+		pathFields = append(pathFields, field)
 	}
-	return params, nil
+	return pathFields, nil
 }
 
 // isEmptyType 判断类型是否为 api.Empty，不将其他无字段消息视为空类型。
@@ -198,8 +201,8 @@ func renderGoNamedType(t *Type) string {
 	return path.Base(t.ImportPath) + "." + t.Name
 }
 
-// renderTSType 渲染 TypeScript 类型，不支持数组（数组由调用方追加 []）。
-func renderTSType(t *Type) string {
+// renderTSType 渲染 TypeScript 类型，可选别名按模块路径和原类型名查找，数组由调用方追加 []
+func renderTSType(t *Type, aliases ...map[[2]string]string) string {
 	if t == nil {
 		return "unknown"
 	}
@@ -213,9 +216,18 @@ func renderTSType(t *Type) string {
 	case KindBytes:
 		return "Uint8Array"
 	case KindEnum, KindMessage:
+		if len(aliases) > 0 && !isEmptyType(t) {
+			module := t.OutputPrefix
+			if module != "" {
+				module = filepath.ToSlash(filepath.Clean(module))
+			}
+			if name, ok := aliases[0][[2]string{module, t.Name}]; ok {
+				return name
+			}
+		}
 		return t.Name
 	case KindMap:
-		return "Record<" + renderTSType(t.MapKey) + ", " + renderTSType(t.MapElem) + ">"
+		return "Record<" + renderTSType(t.MapKey, aliases...) + ", " + renderTSType(t.MapElem, aliases...) + ">"
 	default:
 		return "unknown"
 	}

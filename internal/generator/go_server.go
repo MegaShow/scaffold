@@ -110,7 +110,7 @@ type tmplGoService struct {
 
 type tmplGoMethod struct {
 	*Method
-	PathParams []string // 按路由顺序排列的路径参数名
+	PathParams []*Field // 按路由顺序排列的路径参数字段
 }
 
 func toTmplGoMessageFile(file *File) (*tmplGoMessageFile, error) {
@@ -207,7 +207,7 @@ func collectGoPathFields(file *File) (map[string][]*Field, []string, error) {
 				used[name] = make(map[string]bool)
 			}
 			for _, param := range params {
-				used[name][param] = true
+				used[name][param.Name] = true
 			}
 		}
 	}

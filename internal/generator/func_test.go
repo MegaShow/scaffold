@@ -17,7 +17,7 @@ func Test_collectPathParams(t *testing.T) {
 		name    string
 		file    *File
 		method  *Method
-		want    []string
+		want    []*Field
 		wantErr string
 	}{
 		{
@@ -35,10 +35,13 @@ func Test_collectPathParams(t *testing.T) {
 				},
 			}}},
 			method: &Method{
-				Pattern:     "/users/{user_id}/{state}",
+				Pattern:     "/users/{state}/{user_id}",
 				RequestType: &Type{Kind: KindMessage, Name: "Request"},
 			},
-			want: []string{"user_id", "state"},
+			want: []*Field{
+				{Name: "state", Type: &Type{Kind: KindEnum, Name: "State"}},
+				{Name: "user_id", Type: &Type{Kind: KindInt64}},
+			},
 		},
 		{
 			name:    "invalid_segment",
@@ -341,6 +344,28 @@ func Test_renderTSType(t *testing.T) {
 	}
 	for _, tt := range testCases {
 		assert.Equal(t, tt.want, renderTSType(tt.arg), tt.name)
+	}
+	aliases := map[[2]string]string{
+		{"", "Request"}:            "Request_",
+		{"gen/first", "Response"}:  "Response_",
+		{"gen/second", "Response"}: "Response__",
+		{"", "State"}:              "State_",
+		{"", "Empty"}:              "Empty_",
+	}
+	for _, tt := range []struct {
+		name string
+		arg  *Type
+		want string
+	}{
+		{"local_alias", &Type{Kind: KindMessage, Name: "Request"}, "Request_"},
+		{"first_module", &Type{Kind: KindMessage, Name: "Response", OutputPrefix: "gen/first"}, "Response_"},
+		{"second_module", &Type{Kind: KindMessage, Name: "Response", OutputPrefix: "gen/second"}, "Response__"},
+		{"missing_alias", &Type{Kind: KindMessage, Name: "Response", OutputPrefix: "gen/third"}, "Response"},
+		{"enum_alias", &Type{Kind: KindEnum, Name: "State"}, "State_"},
+		{"empty_type", &Type{Kind: KindMessage, Name: "Empty", ImportPath: "go.icytown.com/scaffold/internal/gen/api"}, "Empty"},
+		{"nested_map", &Type{Kind: KindMap, MapKey: &Type{Kind: KindString}, MapElem: &Type{Kind: KindMessage, Name: "Request"}}, "Record<string, Request_>"},
+	} {
+		assert.Equal(t, tt.want, renderTSType(tt.arg, aliases), tt.name)
 	}
 }
 

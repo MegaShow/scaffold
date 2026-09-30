@@ -40,7 +40,7 @@ func (m *GinMux) HandleFunc(pattern string, handler func(http.ResponseWriter, *h
 
 func createRouter() *GinMux {
 	router := &GinMux{Engine: gin.New()}
-	parser := &mux.AdaptParser{Form: &mux.FormParser{}, JSON: &mux.JSONParser{}}
+	parser := &mux.AdaptParser{}
 	renderer := &mux.JSONRenderer{}
 	gen.RegisterUserService(router, &ServiceImpl{}, parser, renderer)
 	return router

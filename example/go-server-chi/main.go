@@ -29,7 +29,7 @@ func (m *ChiMux) HandleFunc(pattern string, handler func(http.ResponseWriter, *h
 
 func createRouter() *ChiMux {
 	router := &ChiMux{Router: chi.NewRouter()}
-	parser := &mux.AdaptParser{Form: &mux.FormParser{}, JSON: &mux.JSONParser{}}
+	parser := &mux.AdaptParser{}
 	renderer := &mux.JSONRenderer{}
 	gen.RegisterUserService(router, &ServiceImpl{}, parser, renderer)
 	return router

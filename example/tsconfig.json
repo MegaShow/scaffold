@@ -1,11 +1,16 @@
 {
   "compilerOptions": {
+    "allowImportingTsExtensions": true,
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "noEmit": true,
+    "paths": {
+      "@icytown/scaffold-client": ["../typescript/client/src/index.ts"]
+    },
     "strict": true,
-    "target": "ES2022"
+    "target": "ESNext",
+    "types": ["node"]
   },
   "include": ["**/*.ts"]
 }

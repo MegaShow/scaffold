@@ -22,7 +22,7 @@ type Parser interface {
 	Parse(r *http.Request, v any) error
 }
 
-// AdaptParser 是多种解析器的封装，会根据请求的 Content-Type 使用不同解析器。
+// AdaptParser 按请求方法和 Content-Type 选择解析器，未指定时使用 FormParser 和 JSONParser
 type AdaptParser struct {
 	Form Parser
 	JSON Parser
@@ -37,8 +37,14 @@ func (p *AdaptParser) Parse(r *http.Request, v any) error {
 	switch {
 	case r.Method == http.MethodGet || contentType == "application/x-www-form-urlencoded":
 		parser = p.Form
+		if parser == nil {
+			parser = FormParser{}
+		}
 	case contentType == "application/json":
 		parser = p.JSON
+		if parser == nil {
+			parser = JSONParser{}
+		}
 	default:
 		return errUnsupportedMediaType
 	}
