@@ -36,6 +36,9 @@
   ],
   "author": "MegaShow",
   "license": "MIT",
+  "engines": {
+    "node": ">=25"
+  },
   "sideEffects": false,
   "devDependencies": {
     "@types/node": "^26.6.2",

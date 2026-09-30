@@ -19,7 +19,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/setup@v2
         with:
-          runtime: node@lts
+          runtime: node@latest
           cache: true
           install: false
       - name: Gen Example
@@ -53,7 +53,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/setup@v2
         with:
-          runtime: node@lts
+          runtime: node@latest
           cache: true
           install: false
       - name: Install Dependencies
@@ -91,7 +91,7 @@ jobs:
         working-directory: example
       - name: Codecov
         uses: codecov/codecov-action@v7
-        if: ${{ matrix.go-version }} == 'stable'
+        if: matrix.go-version == 'stable'
         with:
           fail_ci_if_error: true
           files: ./coverage-scaffold.out,./coverage-mux.out,./coverage-example.out
@@ -107,7 +107,7 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/setup@v2
         with:
-          runtime: node@lts
+          runtime: node@latest
           cache: true
           install: false
       - name: Install dependencies
