@@ -209,6 +209,8 @@ func (s *ServiceImpl) GetUser(ctx context.Context, req *gen.GetUserRequest) (*ge
 
 如果希望所有接口返回统一的 JSON 结构，可以实现自定义 mux.Renderer。下面的示例同时保留 HTTP 状态码语义，并将状态码、消息和业务数据封装到响应体中。
 
+Render 接收当前请求 `r *http.Request`，可通过 `r.Context()` 读取请求上下文，或根据请求头调整响应。下例不需要请求信息，因此使用 `_` 忽略该参数。
+
 ```go
 type Response struct {
 	Code    int    `json:"code"`
@@ -218,7 +220,7 @@ type Response struct {
 
 type ResponseRenderer struct{}
 
-func (ResponseRenderer) Render(w http.ResponseWriter, v any, err error) error {
+func (ResponseRenderer) Render(w http.ResponseWriter, _ *http.Request, v any, err error) error {
 	status := http.StatusOK
 	response := &Response{
 		Code:    status,

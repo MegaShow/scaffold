@@ -40,43 +40,43 @@ type wService struct {
 func (s *wService) Test(w http.ResponseWriter, r *http.Request) {
 	req := new(Request)
 	if err := s.parser.Parse(r, req); err != nil {
-		s.renderer.Render(w, nil, mux.ErrBadRequest)
+		s.renderer.Render(w, r, nil, mux.ErrBadRequest)
 		return
 	}
 	resp, err := s.service.Test(r.Context(), req)
-	s.renderer.Render(w, resp, err)
+	s.renderer.Render(w, r, resp, err)
 }
 
 func (s *wService) TestEmpty(w http.ResponseWriter, r *http.Request) {
 	err := s.service.TestEmpty(r.Context())
-	s.renderer.Render(w, nil, err)
+	s.renderer.Render(w, r, nil, err)
 }
 
 func (s *wService) TestEmptyRequest(w http.ResponseWriter, r *http.Request) {
 	resp, err := s.service.TestEmptyRequest(r.Context())
-	s.renderer.Render(w, resp, err)
+	s.renderer.Render(w, r, resp, err)
 }
 
 func (s *wService) TestEmptyResponse(w http.ResponseWriter, r *http.Request) {
 	req := new(Request)
 	if err := s.parser.Parse(r, req); err != nil {
-		s.renderer.Render(w, nil, mux.ErrBadRequest)
+		s.renderer.Render(w, r, nil, mux.ErrBadRequest)
 		return
 	}
 	err := s.service.TestEmptyResponse(r.Context(), req)
-	s.renderer.Render(w, nil, err)
+	s.renderer.Render(w, r, nil, err)
 }
 
 func (s *wService) TestPath(w http.ResponseWriter, r *http.Request) {
 	req := new(Types)
 	if err := s.parser.Parse(r, req); err != nil {
-		s.renderer.Render(w, nil, mux.ErrBadRequest)
+		s.renderer.Render(w, r, nil, mux.ErrBadRequest)
 		return
 	}
 	if err := req.DecodePath(r); err != nil {
-		s.renderer.Render(w, nil, mux.ErrBadRequest)
+		s.renderer.Render(w, r, nil, mux.ErrBadRequest)
 		return
 	}
 	resp, err := s.service.TestPath(r.Context(), req)
-	s.renderer.Render(w, resp, err)
+	s.renderer.Render(w, r, resp, err)
 }

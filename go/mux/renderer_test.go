@@ -36,7 +36,8 @@ func TestJSONRenderer_Render(t *testing.T) {
 	for _, tt := range testCases {
 		w := httptest.NewRecorder()
 		w.Header().Set("Content-Type", "text/plain")
-		err := (JSONRenderer{}).Render(w, tt.v, tt.err)
+		r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
+		err := (JSONRenderer{}).Render(w, r, tt.v, tt.err)
 		assert.Nil(t, err, tt.name)
 		assert.Equal(t, tt.status, w.Code, tt.name)
 		assert.Equal(t, "application/json", w.Header().Get("Content-Type"), tt.name)
@@ -45,5 +46,6 @@ func TestJSONRenderer_Render(t *testing.T) {
 
 	// v 不可序列化时 MarshalWrite 返回错误
 	w := httptest.NewRecorder()
-	assert.NotNil(t, (JSONRenderer{}).Render(w, func() {}, nil))
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
+	assert.NotNil(t, (JSONRenderer{}).Render(w, r, func() {}, nil))
 }

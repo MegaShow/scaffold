@@ -55,22 +55,22 @@ package {{ .Package }}
       {{- if not (isEmptyType .RequestType) }}
         req := new({{ renderGoNamedType .RequestType }})
         if err := s.parser.Parse(r, req); err != nil {
-          s.renderer.Render(w, nil, mux.ErrBadRequest)
+          s.renderer.Render(w, r, nil, mux.ErrBadRequest)
           return
         }
         {{- if .PathParams }}
           if err := req.DecodePath(r); err != nil {
-            s.renderer.Render(w, nil, mux.ErrBadRequest)
+            s.renderer.Render(w, r, nil, mux.ErrBadRequest)
             return
           }
         {{- end }}
       {{- end }}
       {{- if isEmptyType .ResponseType }}
         err := s.service.{{ .Name }}(r.Context(){{ if not (isEmptyType .RequestType) }}, req{{ end }})
-        s.renderer.Render(w, nil, err)
+        s.renderer.Render(w, r, nil, err)
       {{- else }}
         resp, err := s.service.{{ .Name }}(r.Context(){{ if not (isEmptyType .RequestType) }}, req{{ end }})
-        s.renderer.Render(w, resp, err)
+        s.renderer.Render(w, r, resp, err)
       {{- end }}
     }
   {{ end }}

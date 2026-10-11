@@ -34,23 +34,23 @@ type wUserService struct {
 func (s *wUserService) CreateUser(w http.ResponseWriter, r *http.Request) {
 	req := new(CreateUserRequest)
 	if err := s.parser.Parse(r, req); err != nil {
-		s.renderer.Render(w, nil, mux.ErrBadRequest)
+		s.renderer.Render(w, r, nil, mux.ErrBadRequest)
 		return
 	}
 	resp, err := s.service.CreateUser(r.Context(), req)
-	s.renderer.Render(w, resp, err)
+	s.renderer.Render(w, r, resp, err)
 }
 
 func (s *wUserService) GetUser(w http.ResponseWriter, r *http.Request) {
 	req := new(GetUserRequest)
 	if err := s.parser.Parse(r, req); err != nil {
-		s.renderer.Render(w, nil, mux.ErrBadRequest)
+		s.renderer.Render(w, r, nil, mux.ErrBadRequest)
 		return
 	}
 	if err := req.DecodePath(r); err != nil {
-		s.renderer.Render(w, nil, mux.ErrBadRequest)
+		s.renderer.Render(w, r, nil, mux.ErrBadRequest)
 		return
 	}
 	resp, err := s.service.GetUser(r.Context(), req)
-	s.renderer.Render(w, resp, err)
+	s.renderer.Render(w, r, resp, err)
 }
