@@ -4,7 +4,8 @@ package dev;
 
 option go_package = "go.icytown.com/scaffold/example/dev/gen";
 
-import "api/api.proto";
+import "scaffold/api.proto";
+
 import "other/other.proto";
 import "shared.proto";
 

@@ -16,7 +16,7 @@ package com.example.user;
 
 option go_package = "example.com/user";
 
-import "api/api.proto";
+import "scaffold/api.proto";
 
 message GetUserRequest {
   uint32 user_id = 1;

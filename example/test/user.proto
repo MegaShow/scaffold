@@ -4,7 +4,7 @@ package example;
 
 option go_package = "example.com/user/gen";
 
-import "api/api.proto";
+import "scaffold/api.proto";
 
 // 创建用户请求
 message CreateUserRequest {

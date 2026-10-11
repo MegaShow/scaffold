@@ -123,9 +123,9 @@ func runCLI(files []string) error {
 		return fmt.Errorf("resolve own executable path: %w", err)
 	}
 
-	// 确保可执行文件同目录下存在 api/api.proto，供 protoc 通过 -I 解析
-	// import "api/api.proto"。go install 安装场景下该文件不会随二进制分发，
-	// 因此从内嵌内容释放；已存在且内容一致时跳过，内容过期则同步为当前版本。
+	// 确保可执行文件同目录下存在 scaffold/api.proto，供 protoc 通过 -I 解析
+	// import "scaffold/api.proto"。go install 安装场景下该文件不会随二进制分发，
+	// 因此从内嵌内容释放；已存在且内容一致时跳过，内容过期则同步为当前版本
 	if err := ensureApiProto(filepath.Dir(self)); err != nil {
 		return err
 	}
@@ -176,11 +176,11 @@ func validateFormat() error {
 	}
 }
 
-// ensureApiProto 确保 selfDir 下存在 api/api.proto 且内容与内嵌版本一致。
+// ensureApiProto 确保 selfDir 下存在 scaffold/api.proto 且内容与内嵌版本一致
 // 文件缺失时创建；存在但与内嵌内容不一致时（例如旧版本遗留）覆盖为当前版本，
-// 保证 protoc 解析到的 api.proto 与当前二进制匹配。
+// 保证 protoc 解析到的 api.proto 与当前二进制匹配
 func ensureApiProto(selfDir string) error {
-	apiDir := filepath.Join(selfDir, "api")
+	apiDir := filepath.Join(selfDir, "scaffold")
 	target := filepath.Join(apiDir, "api.proto")
 	content := apiProtoContent()
 

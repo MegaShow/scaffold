@@ -33,8 +33,6 @@ Scaffold 的 IDL 代码生成依赖于 protoc，因此在使用前需要安装�
 go install go.icytown.com/scaffold/cmd/protoc-gen-scaffold@latest
 ```
 
-或者直接前往 [GitHub Release](https://github.com/megashow/scaffold/releases) 下载对应二进制文件。
-
 ## 使用
 
 ```sh
