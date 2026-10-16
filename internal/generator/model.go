@@ -6,6 +6,7 @@ type File struct {
 	Path         string        // IDL 源文件路径，如 example/user.proto
 	OutputPrefix string        // 生成文件后缀，如 _scaffold.go
 	Package      string        // 包名
+	InjectMeta   bool          // 是否向 Go handler 的 context 注入方法元信息
 	Services     []*Service    // 服务列表
 	Messages     []*Message    // 消息类型列表
 	Enums        []*Enum       // 枚举类型列表
@@ -26,12 +27,13 @@ type Service struct {
 
 // Method 描述服务内的一个方法。
 type Method struct {
-	Name         string     // 方法名
-	HTTPMethod   HTTPMethod // HTTP 方法
-	Pattern      string     // 路由模式
-	Comment      string     // 注释
-	RequestType  *Type      // 请求类型
-	ResponseType *Type      // 响应类型
+	Name         string                    // 方法名
+	HTTPMethod   HTTPMethod                // HTTP 方法
+	Pattern      string                    // 路由模式
+	Comment      string                    // 注释
+	RequestType  *Type                     // 请求类型
+	ResponseType *Type                     // 响应类型
+	Options      map[string]map[string]any // 按扩展完整名称索引的方法选项
 }
 
 // HTTPMethod 是 HTTP 方法。

@@ -21,33 +21,6 @@ import (
 	"go.icytown.com/scaffold/internal/generator"
 )
 
-type stringsFlag []string
-
-func (f *stringsFlag) Set(v string) error {
-	*f = append(*f, v)
-	return nil
-}
-
-func (i *stringsFlag) String() string { return strings.Join(*i, ",") }
-
-var (
-	includes stringsFlag
-	format   = flag.String("format", "", "代码格式化工具 (prettier)")
-	kind     = flag.String("kind", "", "生成代码的类型")
-	lang     = flag.String("lang", "", "生成代码的目标语言")
-	module   = flag.String("module", "", "Go 模块路径，声明后按 go_package 去除模块前缀生成到对应目录")
-	out      = flag.String("out", ".", "生成代码的输出目录")
-	prettier = flag.String("prettier", "", "prettier 可执行文件路径，默认从 PATH 查找")
-	protoc   = flag.String("protoc", "", "protoc 可执行文件路径，默认从 PATH 查找")
-	version  bool
-)
-
-func init() {
-	flag.Var(&includes, "include", "proto 包含路径，可重复")
-	flag.BoolVar(&version, "v", false, "输出版本号并退出")
-	flag.BoolVar(&version, "version", false, "输出版本号并退出")
-}
-
 func main() {
 	flag.Parse()
 
@@ -137,6 +110,15 @@ func runCLI(files []string) error {
 	}
 
 	options := []string{"paths=" + paths, "lang=" + *lang, "kind=" + *kind, "format=" + *format}
+	if injectMeta.enabled {
+		if len(injectMeta.options) == 0 {
+			options = append(options, "inject-meta=true")
+		} else {
+			for _, option := range injectMeta.options {
+				options = append(options, "inject-meta="+option)
+			}
+		}
+	}
 	if *format == "prettier" {
 		options = append(options, "prettier="+*prettier)
 	}
@@ -159,21 +141,6 @@ func runCLI(files []string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
-}
-
-// validateFormat 校验生成代码的格式化配置。
-func validateFormat() error {
-	switch *format {
-	case "":
-		return nil
-	case "prettier":
-		if *prettier == "" {
-			*prettier = "prettier"
-		}
-		return nil
-	default:
-		return fmt.Errorf("unsupported formatter %q", *format)
-	}
 }
 
 // ensureApiProto 确保 selfDir 下存在 scaffold/api.proto 且内容与内嵌版本一致
@@ -212,7 +179,12 @@ func apiProtoContent() []byte {
 // generateFile 把单个 protobuf 文件转换为中间模型并生成脚手架代码，
 // 生成结果写回插件响应。
 func generateFile(gen *protogen.Plugin, g generator.Generator, file *protogen.File) error {
-	files, err := g.Generate(toFile(gen, file))
+	model, err := toFile(gen, file, injectMeta.options)
+	if err != nil {
+		return err
+	}
+	model.InjectMeta = injectMeta.enabled
+	files, err := g.Generate(model)
 	if err != nil {
 		return err
 	}

@@ -3,8 +3,11 @@ package generator
 import (
 	"errors"
 	"fmt"
+	"math"
 	"path"
 	"path/filepath"
+	"slices"
+	"strconv"
 	"strings"
 	"unicode"
 
@@ -19,6 +22,7 @@ func init() {
 		"renderGoName":      renderGoName,
 		"renderGoNamedType": renderGoNamedType,
 		"renderGoType":      renderGoType,
+		"renderGoValue":     renderGoValue,
 		"renderLineComment": renderLineComment,
 		"renderTSType":      renderTSType,
 		"toLowerCamelCase":  toLowerCamelCase,
@@ -199,6 +203,118 @@ func renderGoNamedType(t *Type) string {
 		return t.Name
 	}
 	return path.Base(t.ImportPath) + "." + t.Name
+}
+
+// renderGoValue 将基础值及嵌套集合转换为 Go 代码，可指定换行的集合层数，默认不换行
+func renderGoValue(value any, lineBreakDepth ...int) (string, error) {
+	depth := 0
+	if len(lineBreakDepth) > 0 {
+		depth = lineBreakDepth[0]
+	}
+	switch v := value.(type) {
+	case nil:
+		return "nil", nil
+	case bool:
+		return strconv.FormatBool(v), nil
+	case string:
+		return strconv.Quote(v), nil
+	case int:
+		return "int(" + strconv.FormatInt(int64(v), 10) + ")", nil
+	case int8:
+		return "int8(" + strconv.FormatInt(int64(v), 10) + ")", nil
+	case int16:
+		return "int16(" + strconv.FormatInt(int64(v), 10) + ")", nil
+	case int32:
+		return fmt.Sprintf("int32(%d)", v), nil
+	case int64:
+		return fmt.Sprintf("int64(%d)", v), nil
+	case uint:
+		return "uint(" + strconv.FormatUint(uint64(v), 10) + ")", nil
+	case uint8:
+		return "uint8(" + strconv.FormatUint(uint64(v), 10) + ")", nil
+	case uint16:
+		return "uint16(" + strconv.FormatUint(uint64(v), 10) + ")", nil
+	case uint32:
+		return fmt.Sprintf("uint32(%d)", v), nil
+	case uint64:
+		return fmt.Sprintf("uint64(%d)", v), nil
+	case uintptr:
+		return "uintptr(" + strconv.FormatUint(uint64(v), 10) + ")", nil
+	case float32:
+		if math.IsNaN(float64(v)) || math.IsInf(float64(v), 0) {
+			return "", fmt.Errorf("unsupported Go value %v", v)
+		}
+		return "float32(" + strconv.FormatFloat(float64(v), 'g', -1, 32) + ")", nil
+	case float64:
+		if math.IsNaN(v) || math.IsInf(v, 0) {
+			return "", fmt.Errorf("unsupported Go value %v", v)
+		}
+		return "float64(" + strconv.FormatFloat(v, 'g', -1, 64) + ")", nil
+	case []byte:
+		if v == nil {
+			return "nil", nil
+		}
+		return "[]byte(" + strconv.Quote(string(v)) + ")", nil
+	case []any:
+		if v == nil {
+			return "nil", nil
+		}
+		parts := make([]string, len(v))
+		for i, item := range v {
+			literal, err := renderGoValue(item, depth-1)
+			if err != nil {
+				return "", err
+			}
+			parts[i] = literal
+		}
+		if len(parts) == 0 {
+			return "[]any{}", nil
+		}
+		if depth > 0 {
+			return "[]any{\n" + strings.Join(parts, ",\n") + ",\n}", nil
+		}
+		return "[]any{" + strings.Join(parts, ", ") + "}", nil
+	case map[string]any:
+		if v == nil {
+			return "nil", nil
+		}
+		return renderGoMap(v, "map[string]any", depth)
+	case map[string]map[string]any:
+		if v == nil {
+			return "nil", nil
+		}
+		values := make(map[string]any, len(v))
+		for key, item := range v {
+			values[key] = item
+		}
+		return renderGoMap(values, "map[string]map[string]any", depth)
+	default:
+		return "", fmt.Errorf("unsupported Go value %T", value)
+	}
+}
+
+// renderGoMap 按键名字典序渲染 map 字面量
+func renderGoMap(values map[string]any, typeName string, depth int) (string, error) {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+	parts := make([]string, 0, len(keys))
+	for _, key := range keys {
+		literal, err := renderGoValue(values[key], depth-1)
+		if err != nil {
+			return "", err
+		}
+		parts = append(parts, strconv.Quote(key)+": "+literal)
+	}
+	if len(parts) == 0 {
+		return typeName + "{}", nil
+	}
+	if depth > 0 {
+		return typeName + "{\n" + strings.Join(parts, ",\n") + ",\n}", nil
+	}
+	return typeName + "{" + strings.Join(parts, ", ") + "}", nil
 }
 
 // renderTSType 渲染 TypeScript 类型，可选别名按模块路径和原类型名查找，数组由调用方追加 []

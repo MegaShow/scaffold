@@ -22,6 +22,21 @@ package {{ .Package }}
 
 {{ range .Services }}
   {{ $wrapperName := printf "w%s" .Name }}
+  {{ $serviceName := .Name }}
+
+  {{ if and $.InjectMeta .Methods }}
+    {{ if gt (len .Methods) 1 }}
+      var (
+        {{ range .Methods -}}
+          meta{{ $serviceName }}{{ .Name }} = metainfo.New("{{ $serviceName }}", "{{ .Name }}", {{ renderGoValue .Options 1 }})
+        {{ end -}}
+      )
+    {{ else }}
+      {{ range .Methods -}}
+        var meta{{ $serviceName }}{{ .Name }} = metainfo.New("{{ $serviceName }}", "{{ .Name }}", {{ renderGoValue .Options 1 }})
+      {{ end }}
+    {{ end }}
+  {{ end }}
 
   {{ renderLineComment .Comment }}
   type {{ .Name }} interface {
@@ -37,10 +52,17 @@ package {{ .Package }}
     {{ end -}}
   }
 
-  func Register{{ .Name }}(m mux.Mux, service {{ .Name }}, parser mux.Parser, renderer mux.Renderer) {
+  func Register{{ .Name }}(m mux.Mux, service {{ .Name }}, parser mux.Parser, renderer mux.Renderer, middlewares ...mux.Middleware) {
     s := {{ $wrapperName }}{service: service, parser: parser, renderer: renderer}
     {{ range .Methods -}}
-      m.HandleFunc("{{ .HTTPMethod }} {{ .Pattern }}", s.{{ .Name }})
+      {{ if $.InjectMeta -}}
+        {{ toLowerCamelCase .Name }}Handler := mux.Chain(s.{{ .Name }}, append([]mux.Middleware{metainfo.Middleware(meta{{ $serviceName }}{{ .Name }})}, middlewares...)...)
+      {{ else -}}
+        {{ toLowerCamelCase .Name }}Handler := mux.Chain(s.{{ .Name }}, middlewares...)
+      {{ end -}}
+    {{ end -}}
+    {{ range .Methods -}}
+      m.HandleFunc("{{ .HTTPMethod }} {{ .Pattern }}", {{ toLowerCamelCase .Name }}Handler)
     {{ end -}}
   }
 

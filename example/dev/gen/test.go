@@ -24,6 +24,12 @@ const (
 	State_ACTIVE      State = 1
 )
 
+// 演示业务侧的方法选项
+type AccessRule struct {
+	Role  string `json:"role"`
+	Audit bool   `json:"audit"`
+}
+
 // 全类型示例的子消息。
 type Child struct {
 	Name string `json:"name"`

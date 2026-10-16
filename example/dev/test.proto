@@ -4,10 +4,21 @@ package dev;
 
 option go_package = "go.icytown.com/scaffold/example/dev/gen";
 
+import "google/protobuf/descriptor.proto";
 import "scaffold/api.proto";
 
 import "other/other.proto";
 import "shared.proto";
+
+// 演示业务侧的方法选项
+message AccessRule {
+  string role = 1;
+  bool audit = 2;
+}
+
+extend google.protobuf.MethodOptions {
+  AccessRule access = 1000;
+}
 
 // 开发调试请求，用于查看和调试各类型的表单解码。
 message Request {
@@ -78,27 +89,20 @@ message Child {
 service Service {
   // 这是一个关于接口的注释
   rpc Test(Request) returns (Response) {
-    option (api.http) = {
-      post: "/test"
-    };
+    option (api.http) = {post: "/test"};
+    option (dev.access) = {role: "editor", audit: true};
   }
   // 测试空请求。
   rpc TestEmptyRequest(api.Empty) returns (Response) {
-    option (api.http) = {
-      get: "/test/empty-request"
-    };
+    option (api.http) = {get: "/test/empty-request"};
   }
   // 测试空响应。
   rpc TestEmptyResponse(Request) returns (api.Empty) {
-    option (api.http) = {
-      post: "/test/empty-response"
-    };
+    option (api.http) = {post: "/test/empty-response"};
   }
   // 测试请求和响应都为空。
   rpc TestEmpty(api.Empty) returns (api.Empty) {
-    option (api.http) = {
-      post: "/test/empty"
-    };
+    option (api.http) = {post: "/test/empty"};
   }
   // 测试 path 参数
   rpc TestPath(Types) returns (Response) {

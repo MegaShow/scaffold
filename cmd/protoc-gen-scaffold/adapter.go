@@ -7,7 +7,9 @@ import (
 	"google.golang.org/protobuf/compiler/protogen"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/descriptorpb"
+	"google.golang.org/protobuf/types/dynamicpb"
 
 	"go.icytown.com/scaffold/internal/gen/api"
 	"go.icytown.com/scaffold/internal/generator"
@@ -15,10 +17,22 @@ import (
 
 // toFile 把 protobuf 文件描述转换为协议无关的中间模型，
 // (api.http) 注解转换为方法的 HTTP 绑定，protoc 版本写入依赖列表。
-func toFile(gen *protogen.Plugin, file *protogen.File) *generator.File {
+func toFile(gen *protogen.Plugin, file *protogen.File, optionNames []string) (*generator.File, error) {
+	var extensions *protoregistry.Types
+	if len(optionNames) > 0 {
+		var err error
+		extensions, err = methodOptionExtensions(gen, optionNames)
+		if err != nil {
+			return nil, err
+		}
+	}
 	services := make([]*generator.Service, 0, len(file.Services))
 	for _, svc := range file.Services {
-		services = append(services, toService(gen, svc, file))
+		service, err := toService(gen, svc, file, extensions)
+		if err != nil {
+			return nil, err
+		}
+		services = append(services, service)
 	}
 	return &generator.File{
 		Path:         file.Desc.Path(),
@@ -30,40 +44,51 @@ func toFile(gen *protogen.Plugin, file *protogen.File) *generator.File {
 		Dependencies: []*generator.Dependency{
 			{Name: "protoc", Version: protocVersion(gen)},
 		},
-	}
+	}, nil
 }
 
 // toService 把 protobuf 服务描述转换为中间模型的服务。
-func toService(gen *protogen.Plugin, svc *protogen.Service, file *protogen.File) *generator.Service {
+func toService(gen *protogen.Plugin, svc *protogen.Service, file *protogen.File, extensions *protoregistry.Types) (*generator.Service, error) {
 	methods := make([]*generator.Method, 0, len(svc.Methods))
 	for _, m := range svc.Methods {
-		method := toMethod(gen, m, file)
-		if method != nil {
-			methods = append(methods, method)
+		httpMethod, pattern := parseHTTPRule(getHTTPRule(m))
+		if httpMethod == "" && pattern == "" {
+			continue
 		}
+		method, err := toMethod(gen, m, file, extensions)
+		if err != nil {
+			return nil, err
+		}
+		methods = append(methods, method)
 	}
 	return &generator.Service{
 		Name:    svc.GoName,
 		Comment: commentOf(svc.Comments),
 		Methods: methods,
-	}
+	}, nil
 }
 
 // toMethod 把 protobuf 方法描述转换为中间模型的方法，
 // 读取 (api.http) 注解确定 HTTP 方法与路由模式。
-func toMethod(gen *protogen.Plugin, m *protogen.Method, file *protogen.File) *generator.Method {
+func toMethod(gen *protogen.Plugin, m *protogen.Method, file *protogen.File, extensions *protoregistry.Types) (*generator.Method, error) {
 	httpMethod, pattern := parseHTTPRule(getHTTPRule(m))
-	if httpMethod == "" && pattern == "" {
-		return nil
+	var options map[string]map[string]any
+	if extensions != nil {
+		var err error
+		options, err = methodOptions(m, extensions)
+		if err != nil {
+			return nil, fmt.Errorf("method %s options: %w", m.Desc.FullName(), err)
+		}
 	}
 	return &generator.Method{
 		Name:         m.GoName,
+		Options:      options,
 		Comment:      commentOf(m.Comments),
 		HTTPMethod:   generator.HTTPMethod(httpMethod),
 		Pattern:      pattern,
 		RequestType:  toType(gen, m.Input, file),
 		ResponseType: toType(gen, m.Output, file),
-	}
+	}, nil
 }
 
 // toType 把 protobuf 消息描述转换为中间模型的类型，
@@ -279,4 +304,120 @@ func parseHTTPRule(rule *api.HttpRule) (string, string) {
 		return "PATCH", v
 	}
 	return "", ""
+}
+
+// methodOptions 按扩展的完整名称收集已选中的方法选项
+func methodOptions(method *protogen.Method, extensions *protoregistry.Types) (map[string]map[string]any, error) {
+	var options map[string]map[string]any
+	encoded, err := proto.Marshal(method.Desc.Options())
+	if err != nil {
+		return nil, err
+	}
+	decoded := new(descriptorpb.MethodOptions)
+	if err := (proto.UnmarshalOptions{Resolver: extensions}).Unmarshal(encoded, decoded); err != nil {
+		return nil, err
+	}
+	message := decoded.ProtoReflect()
+	var optionErr error
+	message.Range(func(field protoreflect.FieldDescriptor, value protoreflect.Value) bool {
+		if !field.IsExtension() {
+			return true
+		}
+		fields, ok := optionValue(field, value).(map[string]any)
+		if !ok {
+			optionErr = fmt.Errorf("method option %s must be a message", field.FullName())
+			return false
+		}
+		if options == nil {
+			options = make(map[string]map[string]any)
+		}
+		options[string(field.FullName())] = fields
+		return true
+	})
+	if optionErr != nil {
+		return nil, optionErr
+	}
+	return options, nil
+}
+
+// methodOptionExtensions 只注册指定的方法扩展，以解析未链接到 Go 代码的业务选项
+func methodOptionExtensions(gen *protogen.Plugin, names []string) (*protoregistry.Types, error) {
+	extensions := new(protoregistry.Types)
+	selected := make(map[protoreflect.FullName]struct{}, len(names))
+	for _, name := range names {
+		selected[protoreflect.FullName(name)] = struct{}{}
+	}
+	registerExtension := func(extension *protogen.Extension) error {
+		if extension.Desc.ContainingMessage().FullName() != "google.protobuf.MethodOptions" {
+			return nil
+		}
+		if _, ok := selected[extension.Desc.FullName()]; !ok {
+			return nil
+		}
+		return extensions.RegisterExtension(dynamicpb.NewExtensionType(extension.Desc))
+	}
+	var register func([]*protogen.Message) error
+	register = func(messages []*protogen.Message) error {
+		for _, message := range messages {
+			for _, extension := range message.Extensions {
+				if err := registerExtension(extension); err != nil {
+					return err
+				}
+			}
+			if err := register(message.Messages); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	for _, file := range gen.Files {
+		for _, extension := range file.Extensions {
+			if err := registerExtension(extension); err != nil {
+				return nil, err
+			}
+		}
+		if err := register(file.Messages); err != nil {
+			return nil, err
+		}
+	}
+	return extensions, nil
+}
+
+// optionValue 将 protobuf 反射值转换为生成器可渲染的 Go 基础值
+func optionValue(field protoreflect.FieldDescriptor, value protoreflect.Value) any {
+	if field.IsList() {
+		list := value.List()
+		items := make([]any, list.Len())
+		for i := range items {
+			items[i] = optionScalar(field, list.Get(i))
+		}
+		return items
+	}
+	if field.IsMap() {
+		items := make(map[string]any)
+		valueField := field.MapValue()
+		value.Map().Range(func(key protoreflect.MapKey, entry protoreflect.Value) bool {
+			items[key.String()] = optionScalar(valueField, entry)
+			return true
+		})
+		return items
+	}
+	return optionScalar(field, value)
+}
+
+// optionScalar 转换单个标量、枚举或消息选项值
+func optionScalar(field protoreflect.FieldDescriptor, value protoreflect.Value) any {
+	switch field.Kind() {
+	case protoreflect.MessageKind, protoreflect.GroupKind:
+		items := make(map[string]any)
+		value.Message().Range(func(child protoreflect.FieldDescriptor, entry protoreflect.Value) bool {
+			items[string(child.Name())] = optionValue(child, entry)
+			return true
+		})
+		return items
+	case protoreflect.EnumKind:
+		return int32(value.Enum())
+	default:
+		return value.Interface()
+	}
 }

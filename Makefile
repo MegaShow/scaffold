@@ -51,12 +51,12 @@ gen-example: build-dev $(BIN)/protoc $(NODE_BIN)/prettier
 	@mkdir -p ./example/test/gen
 	@mkdir -p ./example/go-server/gen
 	@mkdir -p ./example/ts-client/gen
-	@cd ./example/dev && $(BIN)/protoc-gen-scaffold -protoc=$(BIN)/protoc -out=./gen -lang=go -kind=server \
+	@cd ./example/dev && $(BIN)/protoc-gen-scaffold -protoc=$(BIN)/protoc -out=./gen -lang=go -kind=server -inject-meta=dev.access \
 		test.proto shared.proto other/other.proto
 	@cd ./example/dev && $(BIN)/protoc-gen-scaffold -protoc=$(BIN)/protoc -out=./gen -lang=typescript -kind=client \
 		-format=prettier -prettier=$(NODE_BIN)/prettier test.proto shared.proto other/other.proto
 	@cd ./example/test && $(BIN)/protoc-gen-scaffold -protoc=$(BIN)/protoc -out=./gen -lang=go -kind=server user.proto
-	@cd ./example && $(BIN)/protoc-gen-scaffold -protoc=$(BIN)/protoc -out=./go-server/gen -lang=go -kind=server user.proto
+	@cd ./example && $(BIN)/protoc-gen-scaffold -protoc=$(BIN)/protoc -out=./go-server/gen -lang=go -kind=server -inject-meta=true user.proto
 	@cd ./example && $(BIN)/protoc-gen-scaffold -protoc=$(BIN)/protoc -out=./ts-client/gen -lang=typescript -kind=client \
 		 -format=prettier -prettier=$(NODE_BIN)/prettier user.proto
 	@echo "Generate example source code success"

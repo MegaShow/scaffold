@@ -9,6 +9,7 @@ import (
 
 	"go.icytown.com/scaffold/example/go-server/gen"
 	"go.icytown.com/scaffold/mux"
+	"go.icytown.com/scaffold/mux/metainfo"
 )
 
 type ServiceImpl struct{}
@@ -23,6 +24,18 @@ type ChiMux struct {
 
 var _ mux.Mux = (*ChiMux)(nil)
 
+func middleware(next http.HandlerFunc) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		meta := metainfo.GetMeta(r.Context())
+		if meta == nil {
+			http.Error(w, "method metadata is missing", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("X-Scaffold-Method", meta.MethodName())
+		next(w, r)
+	})
+}
+
 func (m *ChiMux) HandleFunc(pattern string, handler func(http.ResponseWriter, *http.Request)) {
 	m.Router.HandleFunc(pattern, handler)
 }
@@ -31,7 +44,7 @@ func createRouter() *ChiMux {
 	router := &ChiMux{Router: chi.NewRouter()}
 	parser := &mux.AdaptParser{}
 	renderer := &mux.JSONRenderer{}
-	gen.RegisterUserService(router, &ServiceImpl{}, parser, renderer)
+	gen.RegisterUserService(router, &ServiceImpl{}, parser, renderer, middleware)
 	return router
 }
 

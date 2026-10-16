@@ -19,10 +19,12 @@ type UserService interface {
 	GetUser(ctx context.Context, req *GetUserRequest) (*GetUserResponse, error)          // 查询用户
 }
 
-func RegisterUserService(m mux.Mux, service UserService, parser mux.Parser, renderer mux.Renderer) {
+func RegisterUserService(m mux.Mux, service UserService, parser mux.Parser, renderer mux.Renderer, middlewares ...mux.Middleware) {
 	s := wUserService{service: service, parser: parser, renderer: renderer}
-	m.HandleFunc("POST /users", s.CreateUser)
-	m.HandleFunc("GET /users/{user_id}", s.GetUser)
+	createUserHandler := mux.Chain(s.CreateUser, middlewares...)
+	getUserHandler := mux.Chain(s.GetUser, middlewares...)
+	m.HandleFunc("POST /users", createUserHandler)
+	m.HandleFunc("GET /users/{user_id}", getUserHandler)
 }
 
 type wUserService struct {

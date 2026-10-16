@@ -11,6 +11,17 @@ import (
 	"net/http"
 
 	"go.icytown.com/scaffold/mux"
+	"go.icytown.com/scaffold/mux/metainfo"
+)
+
+var (
+	metaServiceTest = metainfo.New("Service", "Test", map[string]map[string]any{
+		"dev.access": map[string]any{"audit": true, "role": "editor"},
+	})
+	metaServiceTestEmpty         = metainfo.New("Service", "TestEmpty", nil)
+	metaServiceTestEmptyRequest  = metainfo.New("Service", "TestEmptyRequest", nil)
+	metaServiceTestEmptyResponse = metainfo.New("Service", "TestEmptyResponse", nil)
+	metaServiceTestPath          = metainfo.New("Service", "TestPath", nil)
 )
 
 // 开发调试服务。
@@ -22,13 +33,18 @@ type Service interface {
 	TestPath(ctx context.Context, req *Types) (*Response, error) // 测试 path 参数
 }
 
-func RegisterService(m mux.Mux, service Service, parser mux.Parser, renderer mux.Renderer) {
+func RegisterService(m mux.Mux, service Service, parser mux.Parser, renderer mux.Renderer, middlewares ...mux.Middleware) {
 	s := wService{service: service, parser: parser, renderer: renderer}
-	m.HandleFunc("POST /test", s.Test)
-	m.HandleFunc("POST /test/empty", s.TestEmpty)
-	m.HandleFunc("GET /test/empty-request", s.TestEmptyRequest)
-	m.HandleFunc("POST /test/empty-response", s.TestEmptyResponse)
-	m.HandleFunc("GET /test/path/{bool_value}/{bytes_value}/{double_value}/{float_value}/{int32_value}/{int64_value}/{uint32_value}/{uint64_value}/{state}", s.TestPath)
+	testHandler := mux.Chain(s.Test, append([]mux.Middleware{metainfo.Middleware(metaServiceTest)}, middlewares...)...)
+	testEmptyHandler := mux.Chain(s.TestEmpty, append([]mux.Middleware{metainfo.Middleware(metaServiceTestEmpty)}, middlewares...)...)
+	testEmptyRequestHandler := mux.Chain(s.TestEmptyRequest, append([]mux.Middleware{metainfo.Middleware(metaServiceTestEmptyRequest)}, middlewares...)...)
+	testEmptyResponseHandler := mux.Chain(s.TestEmptyResponse, append([]mux.Middleware{metainfo.Middleware(metaServiceTestEmptyResponse)}, middlewares...)...)
+	testPathHandler := mux.Chain(s.TestPath, append([]mux.Middleware{metainfo.Middleware(metaServiceTestPath)}, middlewares...)...)
+	m.HandleFunc("POST /test", testHandler)
+	m.HandleFunc("POST /test/empty", testEmptyHandler)
+	m.HandleFunc("GET /test/empty-request", testEmptyRequestHandler)
+	m.HandleFunc("POST /test/empty-response", testEmptyResponseHandler)
+	m.HandleFunc("GET /test/path/{bool_value}/{bytes_value}/{double_value}/{float_value}/{int32_value}/{int64_value}/{uint32_value}/{uint64_value}/{state}", testPathHandler)
 }
 
 type wService struct {

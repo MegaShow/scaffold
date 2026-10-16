@@ -15,5 +15,6 @@ func TestChiMux(t *testing.T) {
 	r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/users/1", nil)
 	router.ServeHTTP(w, r)
 	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, "GetUser", w.Header().Get("X-Scaffold-Method"))
 	assert.Equal(t, `{"user_id":"1","name":"User 1"}`, w.Body.String())
 }

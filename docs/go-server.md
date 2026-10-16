@@ -263,3 +263,73 @@ gen.RegisterUserService(serveMux, &ServiceImpl{}, parser, renderer)
 ```json
 { "code": 404, "message": "user not found" }
 ```
+
+### 传递方法元信息
+
+生成服务代码时设置 `-inject-meta=true`，生成的路由就会在调用中间件和业务方法前将服务名和方法名写入请求的 `context.Context`：
+
+```sh
+protoc-gen-scaffold -lang=go -kind=server -inject-meta=true user.proto
+```
+
+业务方法通过 metainfo.GetMeta(ctx) 读取元信息。ServiceName() 和 MethodName() 返回不含 proto 包名的名称；未启用注入时，GetMeta(ctx) 返回 `nil`。
+
+如果还要读取 proto 中定义的业务选项，可以在前面的 user.proto 中增加消息类型的方法扩展：
+
+```proto
+import "google/protobuf/descriptor.proto";
+
+message AccessRule {
+  string role = 1;
+  bool audit = 2;
+}
+
+extend google.protobuf.MethodOptions {
+  AccessRule access = 1000;
+}
+```
+
+然后在 GetUser 的 RPC 定义中设置该选项。
+
+```proto
+option (com.example.user.access) = {
+  role: "admin"
+  audit: true
+};
+```
+
+生成时传入选项的完整名称，多个选项用逗号分隔，例如 `-inject-meta=com.example.user.access,com.example.user.audit`。
+
+```sh
+protoc-gen-scaffold -lang=go -kind=server -inject-meta=com.example.user.access user.proto
+```
+
+生成的路由处理链会用 `metainfo.WithMeta` 将选中的选项写入请求上下文。业务代码可以按完整名称读取该选项的消息字段，未选中的选项不会进入生成代码：
+
+```go
+func (s *ServiceImpl) GetUser(ctx context.Context, req *gen.GetUserRequest) (*gen.GetUserResponse, error) {
+	meta := metainfo.GetMeta(ctx)
+	if meta != nil {
+		if access := meta.MethodOption("com.example.user.access"); access != nil && access["audit"] == true {
+			fmt.Printf("calling %s.%s\n", meta.ServiceName(), meta.MethodName())
+		}
+	}
+	return &gen.GetUserResponse{UserID: req.UserID, Name: "Alice"}, nil
+}
+```
+
+### 使用中间件
+
+注册 service 时可以传入一个或多个 `mux.Middleware` 中间件，它们按传入顺序执行，并且只作用于该 service 的路由。中间件的签名是 `func(http.HandlerFunc) http.HandlerFunc`。下面的示例打印请求处理前后的信息。
+
+```go
+func logRequest(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		fmt.Printf("before: %s %s\n", r.Method, r.URL.Path)
+		next(w, r)
+		fmt.Printf("after: %s %s\n", r.Method, r.URL.Path)
+	}
+}
+
+gen.RegisterUserService(serveMux, service, parser, renderer, logRequest)
+```

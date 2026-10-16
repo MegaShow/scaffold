@@ -39,15 +39,16 @@ go install go.icytown.com/scaffold/cmd/protoc-gen-scaffold@latest
 protoc-gen-scaffold [flags] [proto file]
 ```
 
-| Flag        | 介绍                                        |
-| ----------- | ------------------------------------------- |
-| `-format`   | 格式化工具 (prettier)，默认不使用格式化工具 |
-| `-include`  | 查找 proto 文件的目录，允许指定多个         |
-| `-kind`     | 生成代码类型 (server/client)                |
-| `-lang`     | 生成代码语言                                |
-| `-out`      | 生成代码的输出目录                          |
-| `-prettier` | Prettier 可执行文件路径，默认从 PATH 查找   |
-| `-protoc`   | protoc 可执行文件路径，默认从 PATH 查找     |
+| Flag | 介绍 |
+| -- | -- |
+| `-format` | 格式化工具 (prettier)，默认不使用格式化工具 |
+| `-include` | 查找 proto 文件的目录，允许指定多个 |
+| `-inject-meta` | 注入元信息，接受 `true`、`false` 或逗号分隔的消息类型 `package.option` |
+| `-kind` | 生成代码类型 (server/client) |
+| `-lang` | 生成代码语言 |
+| `-out` | 生成代码的输出目录 |
+| `-prettier` | Prettier 可执行文件路径，默认从 PATH 查找 |
+| `-protoc` | protoc 可执行文件路径，默认从 PATH 查找 |
 
 具体代码生成和使用见以下文档：
 

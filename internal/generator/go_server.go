@@ -96,11 +96,12 @@ func (m *tmplGoMessage) IsUsedInRequest() bool {
 }
 
 type tmplGoServiceFile struct {
-	Package  string           // 包名
-	Source   string           // 源文件路径
-	Versions []string         // 版本注释行
-	Imports  [][]string       // 分组排序后的导入路径列表，标准库在前，组间以空行分隔
-	Services []*tmplGoService // 服务列表
+	Package    string           // 包名
+	Source     string           // 源文件路径
+	Versions   []string         // 版本注释行
+	InjectMeta bool             // 是否生成方法元信息注入代码
+	Imports    [][]string       // 分组排序后的导入路径列表，标准库在前，组间以空行分隔
+	Services   []*tmplGoService // 服务列表
 }
 
 type tmplGoService struct {
@@ -246,11 +247,12 @@ func toTmplGoServiceFile(file *File) (*tmplGoServiceFile, error) {
 		services = append(services, s)
 	}
 	return &tmplGoServiceFile{
-		Package:  file.Package,
-		Source:   file.Path,
-		Versions: versionLines(file),
-		Imports:  groupGoImports(imports),
-		Services: services,
+		Package:    file.Package,
+		InjectMeta: file.InjectMeta,
+		Source:     file.Path,
+		Versions:   versionLines(file),
+		Imports:    groupGoImports(imports),
+		Services:   services,
 	}, nil
 }
 
@@ -289,6 +291,9 @@ func collectGoServiceImports(file *File) []string {
 		"context":                     {},
 		"net/http":                    {},
 		"go.icytown.com/scaffold/mux": {},
+	}
+	if file.InjectMeta {
+		paths["go.icytown.com/scaffold/mux/metainfo"] = struct{}{}
 	}
 	for _, service := range file.Services {
 		for _, method := range service.Methods {

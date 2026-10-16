@@ -1,6 +1,7 @@
 package generator
 
 import (
+	"math"
 	"testing"
 
 	"go.icytown.com/scaffold/internal/assert"
@@ -313,6 +314,75 @@ func Test_renderGoType(t *testing.T) {
 	}
 	for _, tt := range testCases {
 		assert.Equal(t, tt.want, renderGoType(tt.arg), tt.name)
+	}
+}
+
+func Test_renderGoValue(t *testing.T) {
+	t.Parallel()
+	testCases := []struct {
+		name    string
+		value   any
+		depth   []int
+		want    string
+		wantErr string
+	}{
+		{name: "nil", want: "nil"},
+		{name: "nil_options", value: map[string]map[string]any(nil), want: "nil"},
+		{name: "nil_list", value: []any(nil), want: "nil"},
+		{name: "bool", value: true, want: "true"},
+		{name: "string", value: "a\nb", want: `"a\nb"`},
+		{name: "int32", value: int32(-3), want: "int32(-3)"},
+		{name: "int", value: -2, want: "int(-2)"},
+		{name: "uint8", value: uint8(4), want: "uint8(4)"},
+		{name: "uint64", value: uint64(5), want: "uint64(5)"},
+		{name: "float32", value: float32(1.5), want: "float32(1.5)"},
+		{name: "float64_precision", value: 1.2345678901234567, want: "float64(1.2345678901234567)"},
+		{name: "nan", value: math.NaN(), wantErr: "unsupported Go value NaN"},
+		{name: "bytes", value: []byte{0, 'a'}, want: `[]byte("\x00a")`},
+		{name: "list", value: []any{true, "item"}, want: `[]any{true, "item"}`},
+		{name: "list_depth_1", value: []any{true, "item"}, depth: []int{1}, want: "[]any{\ntrue,\n\"item\",\n}"},
+		{
+			name:  "flat_options_depth_1",
+			value: map[string]map[string]any{"dev.access": {"role": "editor", "audit": true}},
+			depth: []int{1},
+			want:  "map[string]map[string]any{\n\"dev.access\": map[string]any{\"audit\": true, \"role\": \"editor\"},\n}",
+		},
+		{
+			name: "nested_map",
+			value: map[string]map[string]any{
+				"dev": {"role": "editor", "access": map[string]any{"write": true, "read": true}},
+			},
+			want: `map[string]map[string]any{"dev": map[string]any{"access": map[string]any{"read": true, "write": true}, "role": "editor"}}`,
+		},
+		{
+			name: "nested_map_depth_1",
+			value: map[string]map[string]any{
+				"dev": {"role": "editor", "access": map[string]any{"write": true, "read": true}},
+			},
+			depth: []int{1},
+			want:  "map[string]map[string]any{\n\"dev\": map[string]any{\"access\": map[string]any{\"read\": true, \"write\": true}, \"role\": \"editor\"},\n}",
+		},
+		{
+			name: "nested_map_depth_2",
+			value: map[string]map[string]any{
+				"dev": {"role": "editor", "access": map[string]any{"write": true, "read": true}},
+			},
+			depth: []int{2},
+			want:  "map[string]map[string]any{\n\"dev\": map[string]any{\n\"access\": map[string]any{\"read\": true, \"write\": true},\n\"role\": \"editor\",\n},\n}",
+		},
+		{name: "unsupported", value: make(chan int), wantErr: "unsupported Go value chan int"},
+	}
+	for _, tt := range testCases {
+		got, err := renderGoValue(tt.value, tt.depth...)
+		if tt.wantErr != "" {
+			if !assert.NotNil(t, err, tt.name) {
+				continue
+			}
+			assert.Equal(t, tt.wantErr, err.Error(), tt.name)
+			continue
+		}
+		assert.Nil(t, err, tt.name)
+		assert.Equal(t, tt.want, got, tt.name)
 	}
 }
 

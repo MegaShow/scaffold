@@ -11,15 +11,19 @@ import (
 	"net/http"
 
 	"go.icytown.com/scaffold/mux"
+	"go.icytown.com/scaffold/mux/metainfo"
 )
+
+var metaUserServiceGetUser = metainfo.New("UserService", "GetUser", nil)
 
 type UserService interface {
 	GetUser(ctx context.Context, req *GetUserRequest) (*GetUserResponse, error)
 }
 
-func RegisterUserService(m mux.Mux, service UserService, parser mux.Parser, renderer mux.Renderer) {
+func RegisterUserService(m mux.Mux, service UserService, parser mux.Parser, renderer mux.Renderer, middlewares ...mux.Middleware) {
 	s := wUserService{service: service, parser: parser, renderer: renderer}
-	m.HandleFunc("GET /users/{user_id}", s.GetUser)
+	getUserHandler := mux.Chain(s.GetUser, append([]mux.Middleware{metainfo.Middleware(metaUserServiceGetUser)}, middlewares...)...)
+	m.HandleFunc("GET /users/{user_id}", getUserHandler)
 }
 
 type wUserService struct {

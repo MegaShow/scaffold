@@ -13,6 +13,12 @@ export enum State {
   ACTIVE = 1,
 }
 
+/** 演示业务侧的方法选项 */
+export interface AccessRule {
+  role?: string;
+  audit?: boolean;
+}
+
 /** 全类型示例的子消息。 */
 export interface Child {
   name?: string;
