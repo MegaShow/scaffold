@@ -14,15 +14,27 @@
 {{- end }}
 
 {{ range .Services }}
+  {{- $needsComposer := false }}
+  {{- range .Methods }}
+    {{- if not (isEmptyType .RequestType) }}
+      {{- $needsComposer = true }}
+      {{- break }}
+    {{- end }}
+  {{- end }}
+
   {{- renderDocComment .Comment }}
   export class {{ .Name }} {
     readonly #client: Client;
+    {{- if $needsComposer }}
     readonly #composer: RequestComposer;
+    {{- end }}
     readonly #resolver: ResponseResolver;
 
     constructor(client: Client, options: { composer: RequestComposer; resolver: ResponseResolver }) {
       this.#client = client;
+      {{- if $needsComposer }}
       this.#composer = options.composer;
+      {{- end }}
       this.#resolver = options.resolver;
     }
 

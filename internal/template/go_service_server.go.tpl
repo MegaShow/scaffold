@@ -21,6 +21,13 @@ package {{ .Package }}
 {{ end }}
 
 {{ range .Services }}
+  {{- $needsParser := false }}
+  {{- range .Methods }}
+    {{- if not (isEmptyType .RequestType) }}
+      {{- $needsParser = true }}
+      {{- break }}
+    {{- end }}
+  {{- end }}
   {{ $wrapperName := printf "w%s" .Name }}
   {{ $serviceName := .Name }}
 
@@ -52,8 +59,8 @@ package {{ .Package }}
     {{ end -}}
   }
 
-  func Register{{ .Name }}(m mux.Mux, service {{ .Name }}, parser mux.Parser, renderer mux.Renderer, middlewares ...mux.Middleware) {
-    s := {{ $wrapperName }}{service: service, parser: parser, renderer: renderer}
+  func Register{{ .Name }}(m mux.Mux, service {{ .Name }}, {{ if $needsParser }}parser{{ else }}_{{ end }} mux.Parser, renderer mux.Renderer, middlewares ...mux.Middleware) {
+    s := {{ $wrapperName }}{service: service, {{ if $needsParser }}parser: parser, {{ end }}renderer: renderer}
     {{ range .Methods -}}
       {{ if $.InjectMeta -}}
         {{ toLowerCamelCase .Name }}Handler := mux.Chain(s.{{ .Name }}, append([]mux.Middleware{metainfo.Middleware(meta{{ $serviceName }}{{ .Name }})}, middlewares...)...)
@@ -68,7 +75,9 @@ package {{ .Package }}
 
   type {{ $wrapperName }} struct {
     service  {{ .Name }}
+    {{- if $needsParser }}
     parser   mux.Parser
+    {{- end }}
     renderer mux.Renderer
   }
 
