@@ -21,5 +21,11 @@ describe('HTTPError', () => {
       assert.equal(error.response, response);
       assert.equal(error.data, data);
     });
+
+    it('appends_custom_message_after_default_message', () => {
+      const response: Response = { status: 400, headers: {}, body: new Uint8Array() };
+      const error = new HTTPError(response, undefined, 'invalid request');
+      assert.equal(error.message, 'HTTP request failed with status 400: invalid request');
+    });
   });
 });

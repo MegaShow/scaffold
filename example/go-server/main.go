@@ -16,7 +16,7 @@ func (s *ServiceImpl) GetUser(ctx context.Context, req *gen.GetUserRequest) (*ge
 	return &gen.GetUserResponse{UserID: req.UserID, Name: "User " + req.UserID}, nil
 }
 
-func middleware(next http.HandlerFunc) http.HandlerFunc {
+func middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		meta := metainfo.GetMeta(r.Context())
 		if meta == nil {
@@ -24,7 +24,7 @@ func middleware(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 		w.Header().Set("X-Scaffold-Method", meta.MethodName())
-		next(w, r)
+		next.ServeHTTP(w, r)
 	})
 }
 

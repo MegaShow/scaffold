@@ -320,15 +320,15 @@ func (s *ServiceImpl) GetUser(ctx context.Context, req *gen.GetUserRequest) (*ge
 
 ### 使用中间件
 
-注册 service 时可以传入一个或多个 `mux.Middleware` 中间件，它们按传入顺序执行，并且只作用于该 service 的路由。中间件的签名是 `func(http.HandlerFunc) http.HandlerFunc`。下面的示例打印请求处理前后的信息。
+注册 service 时可以传入一个或多个 `mux.Middleware` 中间件，它们按传入顺序执行，并且只作用于该 service 的路由。中间件的签名是 `func(http.Handler) http.Handler`。下面的示例打印请求处理前后的信息。
 
 ```go
-func logRequest(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+func logRequest(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fmt.Printf("before: %s %s\n", r.Method, r.URL.Path)
-		next(w, r)
+		next.ServeHTTP(w, r)
 		fmt.Printf("after: %s %s\n", r.Method, r.URL.Path)
-	}
+	})
 }
 
 gen.RegisterUserService(serveMux, service, parser, renderer, logRequest)

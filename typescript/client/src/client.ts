@@ -63,8 +63,8 @@ export class HTTPError extends Error {
   readonly data: unknown;
   readonly response: Response;
 
-  constructor(response: Response, data: unknown) {
-    super(`HTTP request failed with status ${response.status}`);
+  constructor(response: Response, data: unknown, msg?: string) {
+    super(`HTTP request failed with status ${response.status}${msg ? `: ${msg}` : ''}`);
     this.name = 'HTTPError';
     this.data = data;
     this.response = response;

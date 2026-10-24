@@ -6,6 +6,20 @@
 
 安装 Scaffold Client 运行时库。
 
+使用 npm：
+
+```sh
+npm install @icytown/scaffold-client
+```
+
+使用 yarn：
+
+```sh
+yarn add @icytown/scaffold-client
+```
+
+使用 pnpm：
+
 ```sh
 pnpm add @icytown/scaffold-client
 ```

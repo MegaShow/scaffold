@@ -22,10 +22,10 @@ func GetMeta(ctx context.Context) Meta {
 }
 
 // Middleware 在调用后续处理器前注入方法元信息
-func Middleware(meta Meta) func(http.HandlerFunc) http.HandlerFunc {
-	return func(next http.HandlerFunc) http.HandlerFunc {
+func Middleware(meta Meta) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			next(w, r.WithContext(WithMeta(r.Context(), meta)))
+			next.ServeHTTP(w, r.WithContext(WithMeta(r.Context(), meta)))
 		})
 	}
 }
@@ -41,7 +41,7 @@ type meta struct {
 	options     map[string]map[string]any
 }
 
-// New 创建固定的方法元信息，不建议直接调用该方法
+// New 创建固定的方法元信息，仅供生成代码调用，禁止业务代码调用
 func New(serviceName, methodName string, options map[string]map[string]any) Meta {
 	return &meta{
 		serviceName: serviceName,

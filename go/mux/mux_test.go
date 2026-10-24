@@ -11,16 +11,16 @@ import (
 func TestChain(t *testing.T) {
 	t.Parallel()
 	var order []string
-	first := func(next http.HandlerFunc) http.HandlerFunc {
+	first := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			order = append(order, "first")
-			next(w, r)
+			next.ServeHTTP(w, r)
 		})
 	}
-	second := func(next http.HandlerFunc) http.HandlerFunc {
+	second := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			order = append(order, "second")
-			next(w, r)
+			next.ServeHTTP(w, r)
 		})
 	}
 	handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

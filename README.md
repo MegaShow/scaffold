@@ -55,6 +55,12 @@ protoc-gen-scaffold [flags] [proto file]
 - [Go Server 使用文档](docs/go-server.md)
 - [TypeScript Client 使用文档](docs/ts-client.md)
 
+详细示例见 [example](example/)。
+
+## 注意事项
+
+在 Golang 运行时依赖 `go.icytown.com/scaffold/mux` 及其子包中，标注 “仅供生成代码调用” 的函数和方法只供生成代码使用，业务代码禁止直接调用。这些 API 的签名和行为不做向后兼容保证。升级 Scaffold 时，应重新生成代码，并同步更新 `go.icytown.com/scaffold/mux` 依赖。
+
 ## 协议
 
 Scaffold 基于 MIT 协议开源。
