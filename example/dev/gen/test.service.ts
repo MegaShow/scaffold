@@ -5,7 +5,7 @@
 // source: test.proto
 
 import type { Client, Request, RequestComposer, ResponseResolver } from '@icytown/scaffold-client';
-import type { Request as Request_, Response as Response_, Types } from './test';
+import type { Request as Request_, Response as Response_, Types, UploadRequest } from './test';
 
 /** 开发调试服务。 */
 export class Service {
@@ -121,5 +121,17 @@ export class Service {
     this.#composer.compose(request, data);
     const response = await this.#client.request(request);
     return this.#resolver.resolve<Response_>(response);
+  }
+
+  /** 测试文件上传 */
+  async testUpload(req: UploadRequest): Promise<void> {
+    const request: Request = {
+      method: 'POST',
+      path: '/test/upload',
+      headers: { Accept: 'application/json', 'Content-Type': 'multipart/form-data' },
+    };
+    this.#composer.compose(request, req);
+    const response = await this.#client.request(request);
+    this.#resolver.resolve<void>(response);
   }
 }

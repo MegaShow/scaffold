@@ -18,14 +18,14 @@ type GetUserRequest struct {
 	UserID string `json:"user_id"`
 }
 
-// DecodeForm 把 url.Values 表单键值解析到 v。
+// DecodeForm 把 url.Values 表单键值解析到 v
 func (v *GetUserRequest) DecodeForm(values url.Values) error {
 	d := form.NewDecoder(values)
 	d.String("user_id", &v.UserID)
 	return d.Err()
 }
 
-// DecodePath 按字段声明顺序解析 names 指定的路径参数，覆盖已有值；遇到错误后停止。
+// DecodePath 按字段声明顺序解析 names 指定的路径参数，覆盖已有值；遇到错误后停止
 func (v *GetUserRequest) DecodePath(r *http.Request) error {
 	d := path.NewDecoder(r)
 	d.String("user_id", &v.UserID)

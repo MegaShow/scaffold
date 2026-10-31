@@ -363,5 +363,23 @@ describe('FetchClient', () => {
       assert.ok(input instanceof URL);
       assert.equal(input.href, 'https://example.com/');
     });
+
+    it('lets_fetch_generate_multipart_boundary_over_default_json_header', async () => {
+      const form = new FormData();
+      form.append('file', new File(['data'], 'test.bin'));
+      const client = new FetchClient({
+        baseURL: 'https://example.test',
+        headers: { 'Content-Type': 'application/json' },
+        fetch: async (url, init) => {
+          assert.equal(init?.body, form);
+          assert.equal(new Headers(init?.headers).has('Content-Type'), false);
+          const actual = new globalThis.Request(url, init);
+          assert.match(actual.headers.get('Content-Type') ?? '', /^multipart\/form-data; boundary=/);
+          assert.equal((await actual.formData()).get('file') instanceof File, true);
+          return new globalThis.Response();
+        },
+      });
+      await client.request({ method: 'POST', path: '/', body: form });
+    });
   });
 });

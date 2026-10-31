@@ -13,10 +13,12 @@ export interface RequestComposer {
 export class AdaptComposer implements RequestComposer {
   readonly form: RequestComposer;
   readonly json: RequestComposer;
+  readonly multipart: RequestComposer;
 
-  constructor(config: { form?: RequestComposer; json?: RequestComposer } = {}) {
+  constructor(config: { form?: RequestComposer; json?: RequestComposer; multipart?: RequestComposer } = {}) {
     this.form = config.form ?? new FormComposer();
     this.json = config.json ?? new JsonComposer();
+    this.multipart = config.multipart ?? new MultipartComposer();
   }
 
   compose(request: Request, value: unknown): void {
@@ -28,6 +30,10 @@ export class AdaptComposer implements RequestComposer {
     }
     if (contentType === 'application/json') {
       this.json.compose(request, value);
+      return;
+    }
+    if (contentType === 'multipart/form-data') {
+      this.multipart.compose(request, value);
       return;
     }
     throw new TypeError('Unsupported media type');
@@ -73,8 +79,26 @@ export class JsonComposer implements RequestComposer {
   }
 }
 
-function appendFormValue(form: URLSearchParams, name: string, value: unknown) {
+/**
+ * 使用原生 FormData 编码上传字段，由传输层生成 boundary
+ */
+export class MultipartComposer implements RequestComposer {
+  compose(request: Request, value: unknown): void {
+    const form = new FormData();
+    appendFormValue(form, '', value);
+    request.body = form;
+  }
+}
+
+function appendFormValue(form: URLSearchParams | FormData, name: string, value: unknown) {
   if (value === null || value === undefined) {
+    return;
+  }
+  if (value instanceof File) {
+    if (!(form instanceof FormData) || name === '') {
+      throw new TypeError('Files require multipart form data');
+    }
+    form.append(name, value);
     return;
   }
   if (typeof value === 'boolean' || typeof value === 'number' || typeof value === 'string') {
@@ -94,7 +118,9 @@ function appendFormValue(form: URLSearchParams, name: string, value: unknown) {
   if (Array.isArray(value)) {
     value.forEach((item, index) => {
       const itemName =
-        typeof item === 'object' && item !== null && !(item instanceof Uint8Array) ? `${name}[${index}]` : name;
+        typeof item === 'object' && item !== null && !(item instanceof Uint8Array) && !(item instanceof File)
+          ? `${name}[${index}]`
+          : name;
       appendFormValue(form, itemName, item);
     });
     return;

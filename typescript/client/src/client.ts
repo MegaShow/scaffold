@@ -38,8 +38,8 @@ export interface Request {
   query?: Record<string, QueryValue | QueryValue[] | undefined>;
   /** HTTP 请求头，重复字段使用字符串数组表示 */
   headers?: Record<string, HeaderValue>;
-  /** 原始请求体字节 */
-  body?: Uint8Array;
+  /** 原始请求体字节或原生上传表单 */
+  body?: Uint8Array | FormData;
   /** 用于取消请求的信号 */
   signal?: AbortSignal;
 }

@@ -9,7 +9,7 @@ export interface AxiosInstance {
     method: Request['method'];
     params: URLSearchParams;
     headers: Record<string, string | string[]>;
-    data?: ArrayBuffer;
+    data?: ArrayBuffer | FormData;
     signal?: AbortSignal;
     responseType: 'arraybuffer';
     validateStatus: (status: number) => boolean;
@@ -48,13 +48,26 @@ export class AxiosClient implements Client {
       headers[name] = typeof value === 'string' ? value : [...value];
     }
 
+    if (request.body instanceof FormData) {
+      for (const name of Object.keys(headers)) {
+        if (name.toLowerCase() === 'content-type') {
+          delete headers[name];
+        }
+      }
+    }
+
     // 仅发送视图中的字节，以二进制接收响应，编解码交由 composer 和 resolver 处理
     const response = await this.#axios.request({
       url: request.path,
       method: request.method,
       params,
       headers,
-      data: request.body === undefined ? undefined : new Uint8Array(request.body).buffer,
+      data:
+        request.body instanceof FormData
+          ? request.body
+          : request.body === undefined
+            ? undefined
+            : new Uint8Array(request.body).buffer,
       signal: request.signal,
       responseType: 'arraybuffer',
       validateStatus: () => true,

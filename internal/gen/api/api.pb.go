@@ -21,7 +21,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// 空请求或响应。
+// 空请求或响应
 type Empty struct {
 	state         protoimpl.MessageState `protogen:"opaque.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -65,7 +65,51 @@ func (b0 Empty_builder) Build() *Empty {
 	return m0
 }
 
-// HTTP 接口配置。
+// 文件类型
+type File struct {
+	state         protoimpl.MessageState `protogen:"opaque.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *File) Reset() {
+	*x = File{}
+	mi := &file_api_api_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *File) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*File) ProtoMessage() {}
+
+func (x *File) ProtoReflect() protoreflect.Message {
+	mi := &file_api_api_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+type File_builder struct {
+	_ [0]func() // Prevents comparability and use of unkeyed literals for the builder.
+
+}
+
+func (b0 File_builder) Build() *File {
+	m0 := &File{}
+	b, x := &b0, m0
+	_, _ = b, x
+	return m0
+}
+
+// HTTP 接口配置
 type HttpRule struct {
 	state                  protoimpl.MessageState `protogen:"opaque.v1"`
 	xxx_hidden_Get         *string                `protobuf:"bytes,1,opt,name=get"`
@@ -81,7 +125,7 @@ type HttpRule struct {
 
 func (x *HttpRule) Reset() {
 	*x = HttpRule{}
-	mi := &file_api_api_proto_msgTypes[1]
+	mi := &file_api_api_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -93,7 +137,7 @@ func (x *HttpRule) String() string {
 func (*HttpRule) ProtoMessage() {}
 
 func (x *HttpRule) ProtoReflect() protoreflect.Message {
-	mi := &file_api_api_proto_msgTypes[1]
+	mi := &file_api_api_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -298,7 +342,8 @@ var File_api_api_proto protoreflect.FileDescriptor
 const file_api_api_proto_rawDesc = "" +
 	"\n" +
 	"\rapi/api.proto\x12\x03api\x1a google/protobuf/descriptor.proto\"\a\n" +
-	"\x05Empty\"p\n" +
+	"\x05Empty\"\x06\n" +
+	"\x04File\"p\n" +
 	"\bHttpRule\x12\x10\n" +
 	"\x03get\x18\x01 \x01(\tR\x03get\x12\x12\n" +
 	"\x04post\x18\x02 \x01(\tR\x04post\x12\x10\n" +
@@ -307,15 +352,16 @@ const file_api_api_proto_rawDesc = "" +
 	"\x05patch\x18\x05 \x01(\tR\x05patch:C\n" +
 	"\x04http\x12\x1e.google.protobuf.MethodOptions\x18\xa1\x8d\x06 \x01(\v2\r.api.HttpRuleR\x04httpB*Z(go.icytown.com/scaffold/internal/gen/apib\beditionsp\xe9\a"
 
-var file_api_api_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_api_api_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_api_api_proto_goTypes = []any{
 	(*Empty)(nil),                      // 0: api.Empty
-	(*HttpRule)(nil),                   // 1: api.HttpRule
-	(*descriptorpb.MethodOptions)(nil), // 2: google.protobuf.MethodOptions
+	(*File)(nil),                       // 1: api.File
+	(*HttpRule)(nil),                   // 2: api.HttpRule
+	(*descriptorpb.MethodOptions)(nil), // 3: google.protobuf.MethodOptions
 }
 var file_api_api_proto_depIdxs = []int32{
-	2, // 0: api.http:extendee -> google.protobuf.MethodOptions
-	1, // 1: api.http:type_name -> api.HttpRule
+	3, // 0: api.http:extendee -> google.protobuf.MethodOptions
+	2, // 1: api.http:type_name -> api.HttpRule
 	2, // [2:2] is the sub-list for method output_type
 	2, // [2:2] is the sub-list for method input_type
 	1, // [1:2] is the sub-list for extension type_name
@@ -334,7 +380,7 @@ func file_api_api_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_api_proto_rawDesc), len(file_api_api_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   3,
 			NumExtensions: 1,
 			NumServices:   0,
 		},

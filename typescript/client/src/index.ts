@@ -8,7 +8,7 @@ import {
   type Request,
   type Response,
 } from './client.ts';
-import { AdaptComposer, FormComposer, JsonComposer, type RequestComposer } from './composer.ts';
+import { AdaptComposer, FormComposer, JsonComposer, MultipartComposer, type RequestComposer } from './composer.ts';
 import { FetchClient, type FetchClientOptions } from './fetch.ts';
 import { JsonResolver, type ResponseResolver } from './resolver.ts';
 
@@ -25,4 +25,13 @@ export type {
   ResponseResolver,
 };
 
-export { AdaptComposer, AxiosClient, FetchClient, FormComposer, HTTPError, JsonComposer, JsonResolver };
+export {
+  AdaptComposer,
+  AxiosClient,
+  FetchClient,
+  FormComposer,
+  HTTPError,
+  JsonComposer,
+  JsonResolver,
+  MultipartComposer,
+};

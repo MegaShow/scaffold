@@ -50,10 +50,14 @@ package {{ .Package }}
   }
 
   {{- if .IsUsedInRequest }}
-    // DecodeForm 把 url.Values 表单键值解析到 v。
+    // DecodeForm 把 url.Values 表单键值解析到 v
     func (v *{{ .Name }}) DecodeForm(values url.Values) error {
       d := form.NewDecoder(values)
       {{- range .Fields }}
+        {{- if eq .Type.Kind "file" }}
+          {{- continue }}
+        {{- end }}
+
         {{- $fieldGoName := renderGoName .Name }}
         {{- $method := renderGoName (printf "%s" .Type.Kind) }}
         {{- if eq .Type.Kind "map" }}
@@ -90,8 +94,32 @@ package {{ .Package }}
     }
   {{- end }}
 
+  {{- if and .IsUsedInRequest .HasFiles }}
+    // DecodeMultipart 解码表单字段并绑定文件
+    func (v *{{ .Name }}) DecodeMultipart(form *multipart.Form) error {
+      if err := v.DecodeForm(form.Value); err != nil {
+        return err
+      }
+      {{- range .Fields }}
+        {{- if eq .Type.Kind "file" }}
+          {{- if .Repeated }}
+            v.{{ renderGoName .Name }} = form.File["{{ .Name }}"]
+          {{- else }}
+            if len(form.File["{{ .Name }}"]) > 1 {
+              return errors.New("field {{ .Name }}: multiple files for single file field")
+            }
+            if len(form.File["{{ .Name }}"]) == 1 {
+              v.{{ renderGoName .Name }} = form.File["{{ .Name }}"][0]
+            }
+          {{- end }}
+        {{- end }}
+      {{- end }}
+      return nil
+    }
+  {{- end }}
+
   {{- if .PathFields }}
-    // DecodePath 按字段声明顺序解析 names 指定的路径参数，覆盖已有值；遇到错误后停止。
+    // DecodePath 按字段声明顺序解析 names 指定的路径参数，覆盖已有值；遇到错误后停止
     func (v *{{ .Name }}) DecodePath(r *http.Request) error {
       d := path.NewDecoder(r)
       {{- range .PathFields }}

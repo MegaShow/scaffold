@@ -86,7 +86,10 @@ package {{ .Package }}
       {{- if not (isEmptyType .RequestType) }}
         req := new({{ renderGoNamedType .RequestType }})
         if err := s.parser.Parse(r, req); err != nil {
-          s.renderer.Render(w, r, nil, mux.ErrBadRequest)
+          if _, ok := err.(mux.StatusCoder); !ok {
+            err = mux.ErrBadRequest
+          }
+          s.renderer.Render(w, r, nil, err)
           return
         }
         {{- if .PathParams }}

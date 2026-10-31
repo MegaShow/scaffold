@@ -5,6 +5,7 @@ import "net/http"
 var (
 	// ErrBadRequest 表示请求格式错误，渲染时映射为 HTTP 400。
 	ErrBadRequest           = &muxError{msg: "400 bad request", statusCode: http.StatusBadRequest}
+	errContentTooLarge      = &muxError{msg: "413 content too large", statusCode: http.StatusRequestEntityTooLarge}
 	errUnsupportedMediaType = &muxError{msg: "415 unsupported media type", statusCode: http.StatusUnsupportedMediaType}
 )
 

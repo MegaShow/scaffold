@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -16,8 +17,11 @@ import (
 )
 
 // toFile 把 protobuf 文件描述转换为协议无关的中间模型，
-// (api.http) 注解转换为方法的 HTTP 绑定，protoc 版本写入依赖列表。
+// (api.http) 注解转换为方法的 HTTP 绑定，protoc 版本写入依赖列表
 func toFile(gen *protogen.Plugin, file *protogen.File, optionNames []string) (*generator.File, error) {
+	if err := validateFiles(file); err != nil {
+		return nil, err
+	}
 	var extensions *protoregistry.Types
 	if len(optionNames) > 0 {
 		var err error
@@ -26,20 +30,27 @@ func toFile(gen *protogen.Plugin, file *protogen.File, optionNames []string) (*g
 			return nil, err
 		}
 	}
+	messages := collectMessages(gen, file)
+	messagesByName := make(map[string]*generator.Message, len(messages))
+	for _, message := range messages {
+		messagesByName[message.Name] = message
+	}
 	services := make([]*generator.Service, 0, len(file.Services))
 	for _, svc := range file.Services {
-		service, err := toService(gen, svc, file, extensions)
+		service, err := toService(gen, svc, file, extensions, messagesByName)
 		if err != nil {
 			return nil, err
 		}
-		services = append(services, service)
+		if service != nil {
+			services = append(services, service)
+		}
 	}
 	return &generator.File{
 		Path:         file.Desc.Path(),
 		OutputPrefix: file.GeneratedFilenamePrefix,
 		Package:      string(file.GoPackageName),
 		Services:     services,
-		Messages:     collectMessages(gen, file),
+		Messages:     messages,
 		Enums:        collectEnums(file),
 		Dependencies: []*generator.Dependency{
 			{Name: "protoc", Version: protocVersion(gen)},
@@ -47,19 +58,55 @@ func toFile(gen *protogen.Plugin, file *protogen.File, optionNames []string) (*g
 	}, nil
 }
 
-// toService 把 protobuf 服务描述转换为中间模型的服务。
-func toService(gen *protogen.Plugin, svc *protogen.Service, file *protogen.File, extensions *protoregistry.Types) (*generator.Service, error) {
+// toMethod 读取 (api.http) 注解并转换方法，没有 HTTP 绑定时返回 nil
+func toMethod(gen *protogen.Plugin, m *protogen.Method, file *protogen.File, extensions *protoregistry.Types, messages map[string]*generator.Message) (*generator.Method, error) {
+	httpMethod, pattern := parseHTTPRule(getHTTPRule(m))
+	if httpMethod == "" {
+		return nil, nil //nolint:nilnil // 没有 HTTP 绑定的方法无需生成
+	}
+	var options map[string]map[string]any
+	if extensions != nil && extensions.NumExtensions() > 0 {
+		var err error
+		options, err = methodOptions(m, extensions)
+		if err != nil {
+			return nil, fmt.Errorf("method %s options: %w", m.Desc.FullName(), err)
+		}
+	}
+	var requestMessage *generator.Message
+	if m.Input.Desc.ParentFile().Path() == file.Desc.Path() {
+		requestMessage = messages[m.Input.GoIdent.GoName]
+	}
+	var responseMessage *generator.Message
+	if m.Output.Desc.ParentFile().Path() == file.Desc.Path() {
+		responseMessage = messages[m.Output.GoIdent.GoName]
+	}
+	return &generator.Method{
+		Name:            m.GoName,
+		Options:         options,
+		Comment:         commentOf(m.Comments),
+		HTTPMethod:      generator.HTTPMethod(httpMethod),
+		Pattern:         pattern,
+		RequestType:     toType(gen, m.Input, file),
+		RequestMessage:  requestMessage,
+		ResponseType:    toType(gen, m.Output, file),
+		ResponseMessage: responseMessage,
+	}, nil
+}
+
+// toService 转换包含 HTTP 方法的服务，没有 HTTP 方法时返回 nil
+func toService(gen *protogen.Plugin, svc *protogen.Service, file *protogen.File, extensions *protoregistry.Types, messages map[string]*generator.Message) (*generator.Service, error) {
 	methods := make([]*generator.Method, 0, len(svc.Methods))
 	for _, m := range svc.Methods {
-		httpMethod, pattern := parseHTTPRule(getHTTPRule(m))
-		if httpMethod == "" && pattern == "" {
-			continue
-		}
-		method, err := toMethod(gen, m, file, extensions)
+		method, err := toMethod(gen, m, file, extensions, messages)
 		if err != nil {
 			return nil, err
 		}
-		methods = append(methods, method)
+		if method != nil {
+			methods = append(methods, method)
+		}
+	}
+	if len(methods) == 0 {
+		return nil, nil //nolint:nilnil // 没有 HTTP 方法的服务无需生成
 	}
 	return &generator.Service{
 		Name:    svc.GoName,
@@ -68,41 +115,91 @@ func toService(gen *protogen.Plugin, svc *protogen.Service, file *protogen.File,
 	}, nil
 }
 
-// toMethod 把 protobuf 方法描述转换为中间模型的方法，
-// 读取 (api.http) 注解确定 HTTP 方法与路由模式。
-func toMethod(gen *protogen.Plugin, m *protogen.Method, file *protogen.File, extensions *protoregistry.Types) (*generator.Method, error) {
-	httpMethod, pattern := parseHTTPRule(getHTTPRule(m))
-	var options map[string]map[string]any
-	if extensions != nil {
-		var err error
-		options, err = methodOptions(m, extensions)
-		if err != nil {
-			return nil, fmt.Errorf("method %s options: %w", m.Desc.FullName(), err)
+// validateFiles 校验文件类型字段只能出现在请求顶层，包含跨文件和递归引用
+func validateFiles(file *protogen.File) error {
+	// 分别记录允许和禁止文件的上下文，避免请求检查掩盖 GET 和响应限制
+	type context struct {
+		message    *protogen.Message
+		allowFiles bool
+	}
+	seen := make(map[context]bool)
+	var walk func(*protogen.Message, bool) error
+	walk = func(message *protogen.Message, allowFiles bool) error {
+		if isFile(message) {
+			return errors.New("api.File must be a top-level request field")
+		}
+		key := context{message: message, allowFiles: allowFiles}
+		if seen[key] {
+			return nil
+		}
+		seen[key] = true
+		for _, field := range message.Fields {
+			if field.Message == nil {
+				continue
+			}
+			if isFile(field.Message) {
+				if !allowFiles || field.Oneof != nil {
+					return fmt.Errorf("field %s: api.File is only supported in top-level request fields outside oneof", field.Desc.FullName())
+				}
+				continue
+			}
+			if err := walk(field.Message, false); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	// 同时检查未被服务引用的声明，避免生成不支持的嵌套文件字段
+	var declarations func([]*protogen.Message) error
+	declarations = func(messages []*protogen.Message) error {
+		for _, message := range messages {
+			if err := walk(message, true); err != nil {
+				return err
+			}
+			if err := declarations(message.Messages); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	if err := declarations(file.Messages); err != nil {
+		return err
+	}
+	for _, service := range file.Services {
+		for _, method := range service.Methods {
+			httpMethod, _ := parseHTTPRule(getHTTPRule(method))
+			if httpMethod == "" {
+				continue
+			}
+			if hasFileFields(method.Input) && method.Input.Desc.ParentFile().Path() != file.Desc.Path() {
+				return fmt.Errorf("method %s: request with file fields must be declared in the service file", method.Desc.FullName())
+			}
+			if err := walk(method.Input, httpMethod != "GET"); err != nil {
+				return fmt.Errorf("method %s request: %w", method.Desc.FullName(), err)
+			}
+			if err := walk(method.Output, false); err != nil {
+				return fmt.Errorf("method %s response: %w", method.Desc.FullName(), err)
+			}
 		}
 	}
-	return &generator.Method{
-		Name:         m.GoName,
-		Options:      options,
-		Comment:      commentOf(m.Comments),
-		HTTPMethod:   generator.HTTPMethod(httpMethod),
-		Pattern:      pattern,
-		RequestType:  toType(gen, m.Input, file),
-		ResponseType: toType(gen, m.Output, file),
-	}, nil
+	return nil
 }
 
-// toType 把 protobuf 消息描述转换为中间模型的类型，
-// 与生成代码同包的类型不携带导入路径。
+func hasFileFields(message *protogen.Message) bool {
+	for _, field := range message.Fields {
+		if isFile(field.Message) {
+			return true
+		}
+	}
+	return false
+}
+
+// toType 转换 protobuf 消息类型，文件类型单独处理，其余复用命名类型转换
 func toType(gen *protogen.Plugin, msg *protogen.Message, file *protogen.File) *generator.Type {
-	t := &generator.Type{
-		Kind:         generator.KindMessage,
-		Name:         msg.GoIdent.GoName,
-		OutputPrefix: outputPrefixOf(gen, msg.Desc.ParentFile().Path()),
+	if isFile(msg) {
+		return &generator.Type{Kind: generator.KindFile}
 	}
-	if msg.GoIdent.GoImportPath != file.GoImportPath {
-		t.ImportPath = string(msg.GoIdent.GoImportPath)
-	}
-	return t
+	return namedFieldType(gen, msg.GoIdent, generator.KindMessage, msg.Desc.ParentFile().Path(), file)
 }
 
 // collectMessages 递归收集文件内的消息定义（含嵌套消息），跳过 map entry 合成消息。
@@ -203,7 +300,7 @@ func toFieldType(gen *protogen.Plugin, field *protogen.Field, file *protogen.Fil
 
 	switch field.Desc.Kind() {
 	case protoreflect.MessageKind:
-		return namedFieldType(gen, field.Message.GoIdent, generator.KindMessage, field.Message.Desc.ParentFile().Path(), file)
+		return toType(gen, field.Message, file)
 	case protoreflect.EnumKind:
 		return namedFieldType(gen, field.Enum.GoIdent, generator.KindEnum, field.Enum.Desc.ParentFile().Path(), file)
 	default:
@@ -283,7 +380,7 @@ func getHTTPRule(method *protogen.Method) *api.HttpRule {
 	return rule
 }
 
-// parseHTTPRule 解析注解中的 HTTP 方法与路由模式，未声明时默认 POST /。
+// parseHTTPRule 解析 HTTP 方法和路由模式，没有有效绑定时返回空字符串
 func parseHTTPRule(rule *api.HttpRule) (string, string) {
 	if rule == nil {
 		return "", ""
@@ -420,4 +517,8 @@ func optionScalar(field protoreflect.FieldDescriptor, value protoreflect.Value) 
 	default:
 		return value.Interface()
 	}
+}
+
+func isFile(message *protogen.Message) bool {
+	return message != nil && message.Desc.FullName() == "api.File" && message.Desc.ParentFile().Path() == "scaffold/api.proto"
 }

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { AdaptComposer, FormComposer, JsonComposer, type Request } from '../src/index.ts';
+import { AdaptComposer, FormComposer, JsonComposer, MultipartComposer, type Request } from '../src/index.ts';
 
 describe('AdaptComposer', () => {
   describe('constructor', () => {
@@ -353,5 +353,33 @@ describe('JsonComposer', () => {
         assert.deepEqual(body, new Uint8Array([1]));
       });
     }
+  });
+});
+
+describe('MultipartComposer', () => {
+  describe('compose', () => {
+    it('preserves_files_and_existing_form_rules', async () => {
+      const file = new File([new Uint8Array([0, 255, 128])], 'test.bin');
+      const request: Request = { method: 'POST', path: '/', headers: { 'content-type': 'multipart/form-data' } };
+      new MultipartComposer().compose(request, {
+        name: 'test',
+        file,
+        files: [file, file],
+        tags: ['a', 'b'],
+        child: { name: 'nested' },
+        bytes: new TextEncoder().encode('text'),
+        missing: undefined,
+      });
+      assert.ok(request.body instanceof FormData);
+      assert.equal(request.body.get('name'), 'test');
+      assert.equal(request.body.get('file'), file);
+      assert.deepEqual(request.body.getAll('files'), [file, file]);
+      assert.deepEqual(request.body.getAll('tags'), ['a', 'b']);
+      assert.equal(request.body.get('child.name'), 'nested');
+      assert.equal(request.body.get('bytes'), 'text');
+      assert.equal(request.body.has('missing'), false);
+      assert.deepEqual(request.headers, { 'content-type': 'multipart/form-data' });
+      assert.deepEqual(new Uint8Array(await file.arrayBuffer()), new Uint8Array([0, 255, 128]));
+    });
   });
 });

@@ -6,10 +6,13 @@ option go_package = "go.icytown.com/scaffold/internal/gen/api";
 
 import "google/protobuf/descriptor.proto";
 
-// 空请求或响应。
+// 空请求或响应
 message Empty {}
 
-// HTTP 接口配置。
+// 文件类型
+message File {}
+
+// HTTP 接口配置
 message HttpRule {
   string get = 1;
   string post = 2;

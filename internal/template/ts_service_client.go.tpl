@@ -60,7 +60,17 @@
               {{- end -}}
             ))
           {{- end }},
-          headers: { Accept: 'application/json', {{ if ne .HTTPMethod "GET" }}'Content-Type': 'application/json'{{ end }} },
+          headers: { Accept: 'application/json',
+            {{- " " -}}
+            {{- if ne .HTTPMethod "GET" }}
+              {{- if and .RequestMessage .RequestMessage.HasFiles -}}
+                'Content-Type': 'multipart/form-data'
+              {{- else -}}
+                'Content-Type': 'application/json'
+              {{- end -}}
+            {{- end }}
+            {{- " " -}}
+          },
         };
         {{- if not (isEmptyType .RequestType) }}
           {{- if .PathParams }}

@@ -58,10 +58,18 @@ export class FetchClient implements Client {
     }
 
     // 发送原始请求体字节，并将取消信号传给 Fetch
+    if (request.body instanceof FormData) {
+      headers.delete('Content-Type');
+    }
     const response = await this.#fetch(url, {
       method: request.method,
       headers,
-      body: request.body === undefined ? undefined : new Uint8Array(request.body),
+      body:
+        request.body instanceof FormData
+          ? request.body
+          : request.body === undefined
+            ? undefined
+            : new Uint8Array(request.body),
       signal: request.signal,
     });
     // 返回 Fetch 提供的状态码、响应头和响应体字节，HTTP 错误状态交由 resolver 处理

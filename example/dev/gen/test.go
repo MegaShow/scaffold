@@ -7,6 +7,8 @@
 package gen
 
 import (
+	"errors"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 
@@ -35,7 +37,7 @@ type Child struct {
 	Name string `json:"name"`
 }
 
-// DecodeForm 把 url.Values 表单键值解析到 v。
+// DecodeForm 把 url.Values 表单键值解析到 v
 func (v *Child) DecodeForm(values url.Values) error {
 	d := form.NewDecoder(values)
 	d.String("name", &v.Name)
@@ -47,7 +49,7 @@ type Request struct {
 	Types *Types `json:"types"`
 }
 
-// DecodeForm 把 url.Values 表单键值解析到 v。
+// DecodeForm 把 url.Values 表单键值解析到 v
 func (v *Request) DecodeForm(values url.Values) error {
 	d := form.NewDecoder(values)
 	d.Struct("types", &v.Types)
@@ -94,7 +96,7 @@ type Types struct {
 	ChildrenByID   map[int64]*Child  `json:"children_by_id"`   // 数值键映射示例：types.children_by_id[1].name。
 }
 
-// DecodeForm 把 url.Values 表单键值解析到 v。
+// DecodeForm 把 url.Values 表单键值解析到 v
 func (v *Types) DecodeForm(values url.Values) error {
 	d := form.NewDecoder(values)
 	d.Int32("id", &v.ID)
@@ -128,7 +130,7 @@ func (v *Types) DecodeForm(values url.Values) error {
 	return d.Err()
 }
 
-// DecodePath 按字段声明顺序解析 names 指定的路径参数，覆盖已有值；遇到错误后停止。
+// DecodePath 按字段声明顺序解析 names 指定的路径参数，覆盖已有值；遇到错误后停止
 func (v *Types) DecodePath(r *http.Request) error {
 	d := path.NewDecoder(r)
 	d.Bool("bool_value", &v.BoolValue)
@@ -141,4 +143,33 @@ func (v *Types) DecodePath(r *http.Request) error {
 	d.Uint64("uint64_value", &v.Uint64Value)
 	d.Enum("state", &v.State)
 	return d.Err()
+}
+
+// 文件上传请求
+type UploadRequest struct {
+	Name  string                  `json:"name"`
+	File  *multipart.FileHeader   `json:"file"`
+	Files []*multipart.FileHeader `json:"files"`
+}
+
+// DecodeForm 把 url.Values 表单键值解析到 v
+func (v *UploadRequest) DecodeForm(values url.Values) error {
+	d := form.NewDecoder(values)
+	d.String("name", &v.Name)
+	return d.Err()
+}
+
+// DecodeMultipart 解码表单字段并绑定文件
+func (v *UploadRequest) DecodeMultipart(form *multipart.Form) error {
+	if err := v.DecodeForm(form.Value); err != nil {
+		return err
+	}
+	if len(form.File["file"]) > 1 {
+		return errors.New("field file: multiple files for single file field")
+	}
+	if len(form.File["file"]) == 1 {
+		v.File = form.File["file"][0]
+	}
+	v.Files = form.File["files"]
+	return nil
 }

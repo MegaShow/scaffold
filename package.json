@@ -8,6 +8,7 @@
     "lint": "eslint .",
     "run:example-ts-client": "pnpm --filter @icytown/scaffold-client build && node example/ts-client/main.ts",
     "run:example-ts-client-axios": "pnpm --filter @icytown/scaffold-client build && node example/ts-client-axios/main.ts",
+    "run:example-ts-client-upload-file": "pnpm --filter @icytown/scaffold-client build && node example/ts-client-upload-file/main.ts",
     "test": "pnpm --filter @icytown/scaffold-client build && node --test",
     "test:coverage": "pnpm --filter @icytown/scaffold-client build && node --test --experimental-test-coverage --test-reporter spec --test-reporter-destination stdout --test-reporter lcov --test-reporter-destination coverage-typescript.info"
   },

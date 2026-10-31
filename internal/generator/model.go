@@ -27,13 +27,15 @@ type Service struct {
 
 // Method 描述服务内的一个方法。
 type Method struct {
-	Name         string                    // 方法名
-	HTTPMethod   HTTPMethod                // HTTP 方法
-	Pattern      string                    // 路由模式
-	Comment      string                    // 注释
-	RequestType  *Type                     // 请求类型
-	ResponseType *Type                     // 响应类型
-	Options      map[string]map[string]any // 按扩展完整名称索引的方法选项
+	Name            string                    // 方法名
+	HTTPMethod      HTTPMethod                // HTTP 方法
+	Pattern         string                    // 路由模式
+	Comment         string                    // 注释
+	RequestType     *Type                     // 请求类型
+	RequestMessage  *Message                  // 当前文件内的请求消息，外部消息为 nil
+	ResponseType    *Type                     // 响应类型
+	ResponseMessage *Message                  // 当前文件内的响应消息，外部消息为 nil
+	Options         map[string]map[string]any // 按扩展完整名称索引的方法选项
 }
 
 // HTTPMethod 是 HTTP 方法。
@@ -52,6 +54,16 @@ type Message struct {
 	Name    string   // 类型名
 	Comment string   // 注释
 	Fields  []*Field // 字段列表
+}
+
+// HasFiles 判断消息是否包含文件类型字段
+func (m *Message) HasFiles() bool {
+	for _, field := range m.Fields {
+		if field.Type.Kind == KindFile {
+			return true
+		}
+	}
+	return false
 }
 
 // Field 描述消息的一个字段。
@@ -89,6 +101,7 @@ const (
 	KindEnum    FieldKind = "enum"
 	KindMessage FieldKind = "message"
 	KindMap     FieldKind = "map"
+	KindFile    FieldKind = "file"
 )
 
 // Enum 描述一个枚举类型定义。

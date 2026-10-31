@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import { Buffer } from 'node:buffer';
+import { once } from 'node:events';
+import { createServer } from 'node:http';
 import { describe, it } from 'node:test';
+
+import { create } from 'axios';
 
 import { AxiosClient, type AxiosInstance, type Request } from '../src/index.ts';
 
@@ -19,6 +23,7 @@ describe('AxiosClient', () => {
             assert.equal(config.url, '/users?existing=value');
             assert.equal(config.method, method);
             assert.equal(config.signal, controller.signal);
+            assert.ok(!(config.data instanceof FormData));
             assert.deepEqual(config.data === undefined ? undefined : new Uint8Array(config.data), body);
             assert.equal(config.responseType, 'arraybuffer');
             assert.equal('baseURL' in config, false);
@@ -207,5 +212,53 @@ describe('AxiosClient', () => {
         assert.equal(calls, 1);
       });
     }
+
+    it('uploads_binary_with_real_axios', async t => {
+      let received: Promise<FormData> | undefined;
+      const server = createServer((request, response) => {
+        const contentType = request.headers['content-type'] ?? '';
+        received = (async () => {
+          const chunks: ArrayBuffer[] = [];
+          for await (const chunk of request) {
+            chunks.push(new Uint8Array(chunk as Uint8Array).buffer);
+          }
+          assert.match(contentType, /^multipart\/form-data; boundary=/);
+          return new globalThis.Response(new Blob(chunks), { headers: { 'Content-Type': contentType } }).formData();
+        })();
+        response.end();
+      });
+      t.after(() => server.close());
+      server.listen(0, '127.0.0.1');
+      await once(server, 'listening');
+      const address = server.address();
+      assert.ok(address && typeof address !== 'string');
+      const client = new AxiosClient(
+        create({
+          baseURL: `http://127.0.0.1:${address.port}`,
+        }),
+      );
+      const form = new FormData();
+      form.append('file', new File([new Uint8Array([0, 255, 128])], 'test.bin'));
+      form.append('name', 'test');
+      await client.request({ method: 'POST', path: '/test/upload', body: form });
+      const parsed = await received;
+      assert.ok(parsed);
+      assert.equal(parsed.get('name'), 'test');
+      const file = parsed.get('file');
+      assert.ok(file instanceof File);
+      assert.equal(file.name, 'test.bin');
+      assert.deepEqual(new Uint8Array(await file.arrayBuffer()), new Uint8Array([0, 255, 128]));
+    });
+    it('passes_native_form_without_content_type', async () => {
+      const form = new FormData();
+      const client = new AxiosClient({
+        request: config => {
+          assert.equal(config.data, form);
+          assert.deepEqual(config.headers, {});
+          return Promise.resolve({ status: 200, headers: {}, data: new ArrayBuffer(0) });
+        },
+      });
+      await client.request({ method: 'POST', path: '/', headers: { 'content-type': 'application/json' }, body: form });
+    });
   });
 });

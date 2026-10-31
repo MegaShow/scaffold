@@ -129,16 +129,17 @@ Scaffold 提供了 `@icytown/scaffold-client` 包，定义与具体 HTTP 实现�
 
 客户端包提供了以下常用实现，也可以自行实现对应接口。
 
-| 接口             | 实现          | 用途                                         |
-| ---------------- | ------------- | -------------------------------------------- |
-| Client           | FetchClient   | 使用 Fetch API 发送请求                      |
-| Client           | AxiosClient   | 使用调用方提供的 Axios 实例发送请求          |
-| RequestComposer  | AdaptComposer | 根据请求方法和 Content-Type 选择组装器       |
-| RequestComposer  | FormComposer  | GET 编码为查询参数，其他方法编码为表单请求体 |
-| RequestComposer  | JsonComposer  | 编码为 JSON 请求体                           |
-| ResponseResolver | JsonResolver  | 检查状态码并解析 JSON 响应                   |
+| 接口             | 实现              | 用途                                       |
+| ---------------- | ----------------- | ------------------------------------------ |
+| Client           | FetchClient       | 使用 Fetch API 发送请求                    |
+| Client           | AxiosClient       | 使用调用方提供的 Axios 实例发送请求        |
+| RequestComposer  | AdaptComposer     | 根据请求方法和 Content-Type 选择组装器     |
+| RequestComposer  | FormComposer      | GET 编码为查询参数，其他方法编码为表单请求体 |
+| RequestComposer  | JsonComposer      | 编码为 JSON 请求体                         |
+| RequestComposer  | MultipartComposer | 使用原生 FormData 编码普通字段和文件       |
+| ResponseResolver | JsonResolver      | 检查状态码并解析 JSON 响应                 |
 
-`new AdaptComposer()` 默认使用 FormComposer 和 JsonComposer。GET 请求使用表单组装器，其余请求根据 Content-Type 选择；不支持的媒体类型会抛出错误。也可以通过构造参数中的 `form`、`json` 单独替换对应实现。
+`new AdaptComposer()` 默认使用 FormComposer、JsonComposer 和 MultipartComposer。GET 请求使用表单组装器，其余请求根据 Content-Type 选择；不支持的媒体类型会抛出错误。也可以通过构造参数中的 `form`、`json`、`multipart` 单独替换对应实现。
 
 ## 常见用法
 
@@ -218,7 +219,7 @@ const service = new UserService(client, { composer, resolver });
 
 ### 发送表单请求
 
-非 GET 方法默认设置 JSON 请求头。如果接口需要表单请求体，可以在自定义 composer 中修改 Content-Type 后调用 FormComposer。
+不包含文件类型字段的非 GET 方法默认设置 JSON 请求头。如果接口需要表单请求体，可以在自定义 composer 中修改 Content-Type 后调用 FormComposer。
 
 ```ts
 import { FormComposer } from '@icytown/scaffold-client';
@@ -241,3 +242,27 @@ class FormRequestComposer implements RequestComposer {
 const composer = new FormRequestComposer();
 const service = new UserService(client, { composer, resolver });
 ```
+
+### 文件上传
+
+通过 `api.File` 声明文件类型字段，使用 `repeated api.File` 声明文件数组，即可生成使用 multipart/form-data 的客户端方法。
+
+```proto
+import "scaffold/api.proto";
+
+message UploadFileRequest {
+  string name = 1;
+  api.File file = 2;
+  repeated api.File files = 3;
+}
+
+service FileService {
+  rpc UploadFile(UploadFileRequest) returns (api.Empty) {
+    option (api.http) = {
+      post: "/files/upload"
+    };
+  }
+}
+```
+
+生成的 TypeScript 类型中，`api.File` 映射为原生 `File`，`repeated api.File` 映射为 `File[]`。FetchClient 和 AxiosClient 都支持发送 FormData，发送时由底层生成包含 boundary 的 Content-Type，无需手动设置。

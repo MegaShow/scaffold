@@ -137,7 +137,7 @@ func toTmplGoMessageFile(file *File) (*tmplGoMessageFile, error) {
 		Package:  file.Package,
 		Source:   file.Path,
 		Versions: versionLines(file),
-		Imports:  groupGoImports(collectGoMessageImports(file, requestImports)),
+		Imports:  groupGoImports(collectGoMessageImports(file, requestImports, usedInRequest)),
 		Messages: messages,
 		Enums:    file.Enums,
 	}, nil
@@ -246,6 +246,9 @@ func toTmplGoServiceFile(file *File) (*tmplGoServiceFile, error) {
 		})
 		services = append(services, s)
 	}
+	slices.SortFunc(services, func(a, b *tmplGoService) int {
+		return strings.Compare(a.Name, b.Name)
+	})
 	return &tmplGoServiceFile{
 		Package:    file.Package,
 		InjectMeta: file.InjectMeta,
@@ -257,12 +260,15 @@ func toTmplGoServiceFile(file *File) (*tmplGoServiceFile, error) {
 }
 
 // collectGoMessageImports 收集消息字段引用的跨包导入及 DecodeForm 的运行时依赖。
-func collectGoMessageImports(file *File, requestImports []string) []string {
+func collectGoMessageImports(file *File, requestImports []string, usedInRequest map[string]bool) []string {
 	paths := map[string]struct{}{}
 	var addType func(t *Type)
 	addType = func(t *Type) {
 		if t == nil {
 			return
+		}
+		if t.Kind == KindFile {
+			paths["mime/multipart"] = struct{}{}
 		}
 		if t.ImportPath != "" {
 			paths[t.ImportPath] = struct{}{}
@@ -273,6 +279,9 @@ func collectGoMessageImports(file *File, requestImports []string) []string {
 	for _, msg := range file.Messages {
 		for _, f := range msg.Fields {
 			addType(f.Type)
+			if usedInRequest[msg.Name] && f.Type.Kind == KindFile && !f.Repeated {
+				paths["errors"] = struct{}{}
+			}
 		}
 	}
 	for _, path := range requestImports {

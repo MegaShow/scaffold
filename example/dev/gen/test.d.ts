@@ -77,3 +77,10 @@ export interface Types {
   /** 数值键映射示例：types.children_by_id[1].name。 */
   children_by_id?: Record<number, Child>;
 }
+
+/** 文件上传请求 */
+export interface UploadRequest {
+  name?: string;
+  file?: File;
+  files?: File[];
+}

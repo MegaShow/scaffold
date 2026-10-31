@@ -85,6 +85,13 @@ message Child {
   string name = 1;
 }
 
+// 文件上传请求
+message UploadRequest {
+  string name = 1;
+  api.File file = 2;
+  repeated api.File files = 3;
+}
+
 // 开发调试服务。
 service Service {
   // 这是一个关于接口的注释
@@ -109,5 +116,9 @@ service Service {
     option (api.http) = {
       get: "/test/path/{bool_value}/{bytes_value}/{double_value}/{float_value}/{int32_value}/{int64_value}/{uint32_value}/{uint64_value}/{state}"
     };
+  }
+  // 测试文件上传
+  rpc TestUpload(UploadRequest) returns (api.Empty) {
+    option (api.http) = {post: "/test/upload"};
   }
 }

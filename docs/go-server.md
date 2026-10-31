@@ -333,3 +333,38 @@ func logRequest(next http.Handler) http.Handler {
 
 gen.RegisterUserService(serveMux, service, parser, renderer, logRequest)
 ```
+
+### 文件上传
+
+通过 `api.File` 声明文件类型字段，可以实现 multipart/form-data 文件上传。在请求消息中使用 `api.File` 声明文件类型字段，使用 `repeated api.File` 声明文件数组。
+
+```proto
+import "scaffold/api.proto";
+
+message UploadFileRequest {
+  string name = 1;
+  api.File file = 2;
+  repeated api.File files = 3;
+}
+
+service FileService {
+  rpc UploadFile(UploadFileRequest) returns (api.Empty) {
+    option (api.http) = {
+      post: "/files/upload"
+    };
+  }
+}
+```
+
+生成 Go 服务代码后，`File` 会被映射为 `*multipart.FileHeader`。可以在注册服务时可指定文件内容的内存阈值和整个请求体的大小上限。MaxMemory 超出后文件内容写入临时文件，不会因此拒绝请求；MaxBytes 限制包含 multipart 开销在内的整个请求体，超过时返回 413。
+
+```go
+serveMux := http.NewServeMux()
+parser := &mux.AdaptParser{
+	Multipart: mux.MultipartParser{
+		MaxMemory: 8 << 20,   // 内存阈值 8 MiB
+		MaxBytes:  128 << 20, // 请求体上限 128 MiB
+	},
+}
+gen.RegisterFileService(serveMux, &ServiceImpl{}, parser, mux.JSONRenderer{})
+```

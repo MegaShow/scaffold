@@ -184,6 +184,8 @@ func renderGoName(name string) string {
 // renderGoType 渲染 Go 类型，不支持数组。
 func renderGoType(t *Type) string {
 	switch t.Kind {
+	case KindFile:
+		return "*multipart.FileHeader"
 	case KindBytes:
 		return "[]byte"
 	case KindEnum:
@@ -323,6 +325,8 @@ func renderTSType(t *Type, aliases ...map[[2]string]string) string {
 		return "unknown"
 	}
 	switch t.Kind {
+	case KindFile:
+		return "File"
 	case KindBool:
 		return "boolean"
 	case KindInt32, KindInt64, KindUint32, KindUint64, KindFloat32, KindFloat64:

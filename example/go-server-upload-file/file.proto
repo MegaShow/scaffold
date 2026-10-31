@@ -1,0 +1,32 @@
+edition = "2024";
+
+package com.example.file;
+
+option go_package = "go.icytown.com/scaffold/example/go-server-upload-file/gen";
+
+import "scaffold/api.proto";
+
+message UploadFileRequest {
+  string name = 1;
+  api.File file = 2;
+  repeated api.File files = 3;
+}
+
+message FileInfo {
+  string filename = 1;
+  int64 size = 2;
+}
+
+message UploadFileResponse {
+  string name = 1;
+  FileInfo file = 2;
+  repeated FileInfo files = 3;
+}
+
+service FileService {
+  rpc UploadFile(UploadFileRequest) returns (UploadFileResponse) {
+    option (api.http) = {
+      post: "/files/upload"
+    };
+  }
+}

@@ -22,6 +22,7 @@ var (
 	metaServiceTestEmptyRequest  = metainfo.New("Service", "TestEmptyRequest", nil)
 	metaServiceTestEmptyResponse = metainfo.New("Service", "TestEmptyResponse", nil)
 	metaServiceTestPath          = metainfo.New("Service", "TestPath", nil)
+	metaServiceTestUpload        = metainfo.New("Service", "TestUpload", nil)
 )
 
 // 开发调试服务。
@@ -31,6 +32,7 @@ type Service interface {
 	TestEmptyRequest(ctx context.Context) (*Response, error)     // 测试空请求。
 	TestEmptyResponse(ctx context.Context, req *Request) error   // 测试空响应。
 	TestPath(ctx context.Context, req *Types) (*Response, error) // 测试 path 参数
+	TestUpload(ctx context.Context, req *UploadRequest) error    // 测试文件上传
 }
 
 func RegisterService(m mux.Mux, service Service, parser mux.Parser, renderer mux.Renderer, middlewares ...mux.Middleware) {
@@ -40,11 +42,13 @@ func RegisterService(m mux.Mux, service Service, parser mux.Parser, renderer mux
 	testEmptyRequestHandler := mux.Chain(s.TestEmptyRequest, append([]mux.Middleware{metainfo.Middleware(metaServiceTestEmptyRequest)}, middlewares...)...)
 	testEmptyResponseHandler := mux.Chain(s.TestEmptyResponse, append([]mux.Middleware{metainfo.Middleware(metaServiceTestEmptyResponse)}, middlewares...)...)
 	testPathHandler := mux.Chain(s.TestPath, append([]mux.Middleware{metainfo.Middleware(metaServiceTestPath)}, middlewares...)...)
+	testUploadHandler := mux.Chain(s.TestUpload, append([]mux.Middleware{metainfo.Middleware(metaServiceTestUpload)}, middlewares...)...)
 	m.HandleFunc("POST /test", testHandler)
 	m.HandleFunc("POST /test/empty", testEmptyHandler)
 	m.HandleFunc("GET /test/empty-request", testEmptyRequestHandler)
 	m.HandleFunc("POST /test/empty-response", testEmptyResponseHandler)
 	m.HandleFunc("GET /test/path/{bool_value}/{bytes_value}/{double_value}/{float_value}/{int32_value}/{int64_value}/{uint32_value}/{uint64_value}/{state}", testPathHandler)
+	m.HandleFunc("POST /test/upload", testUploadHandler)
 }
 
 type wService struct {
@@ -56,7 +60,10 @@ type wService struct {
 func (s *wService) Test(w http.ResponseWriter, r *http.Request) {
 	req := new(Request)
 	if err := s.parser.Parse(r, req); err != nil {
-		s.renderer.Render(w, r, nil, mux.ErrBadRequest)
+		if _, ok := err.(mux.StatusCoder); !ok {
+			err = mux.ErrBadRequest
+		}
+		s.renderer.Render(w, r, nil, err)
 		return
 	}
 	resp, err := s.service.Test(r.Context(), req)
@@ -76,7 +83,10 @@ func (s *wService) TestEmptyRequest(w http.ResponseWriter, r *http.Request) {
 func (s *wService) TestEmptyResponse(w http.ResponseWriter, r *http.Request) {
 	req := new(Request)
 	if err := s.parser.Parse(r, req); err != nil {
-		s.renderer.Render(w, r, nil, mux.ErrBadRequest)
+		if _, ok := err.(mux.StatusCoder); !ok {
+			err = mux.ErrBadRequest
+		}
+		s.renderer.Render(w, r, nil, err)
 		return
 	}
 	err := s.service.TestEmptyResponse(r.Context(), req)
@@ -86,7 +96,10 @@ func (s *wService) TestEmptyResponse(w http.ResponseWriter, r *http.Request) {
 func (s *wService) TestPath(w http.ResponseWriter, r *http.Request) {
 	req := new(Types)
 	if err := s.parser.Parse(r, req); err != nil {
-		s.renderer.Render(w, r, nil, mux.ErrBadRequest)
+		if _, ok := err.(mux.StatusCoder); !ok {
+			err = mux.ErrBadRequest
+		}
+		s.renderer.Render(w, r, nil, err)
 		return
 	}
 	if err := req.DecodePath(r); err != nil {
@@ -95,4 +108,17 @@ func (s *wService) TestPath(w http.ResponseWriter, r *http.Request) {
 	}
 	resp, err := s.service.TestPath(r.Context(), req)
 	s.renderer.Render(w, r, resp, err)
+}
+
+func (s *wService) TestUpload(w http.ResponseWriter, r *http.Request) {
+	req := new(UploadRequest)
+	if err := s.parser.Parse(r, req); err != nil {
+		if _, ok := err.(mux.StatusCoder); !ok {
+			err = mux.ErrBadRequest
+		}
+		s.renderer.Render(w, r, nil, err)
+		return
+	}
+	err := s.service.TestUpload(r.Context(), req)
+	s.renderer.Render(w, r, nil, err)
 }
