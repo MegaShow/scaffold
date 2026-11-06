@@ -14,7 +14,7 @@ for target in linux/amd64 windows/amd64 darwin/arm64; do
   arch=${target#*/}
   binary=protoc-gen-scaffold
   if [[ "$os" == windows ]]; then binary+=.exe; fi
-  asset="$output/github/protoc-gen-scaffold_v${version}_${os}_${arch}"
+  asset="$output/github/scaffold-${version}-${os}-${arch}"
   GOOS="$os" GOARCH="$arch" CGO_ENABLED=0 go build -trimpath -buildvcs=false \
     -ldflags "-X go.icytown.com/scaffold/internal/generator.injectedVersion=v$version" \
     -o "$stage/$binary" ./cmd/protoc-gen-scaffold
@@ -27,7 +27,7 @@ for target in linux/amd64 windows/amd64 darwin/arm64; do
       -C "$stage" -cf - "$binary" LICENSE | gzip -n > "$asset.tar.gz"
   fi
 done
-(cd "$output/github" && sha256sum ./*.tar.gz ./*.zip > checksums.txt)
+(cd "$output/github" && sha256sum -- *.tar.gz *.zip | awk '{print $2, $1}' > checksums.txt)
 
 # 先构建再打包，发布阶段只上传已验证的 tarball，不执行包脚本
 pnpm --filter @icytown/scaffold-client run build

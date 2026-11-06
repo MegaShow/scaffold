@@ -39,9 +39,9 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: pnpm/setup@v2
+      - uses: pnpm/setup@v3
         with:
-          runtime: node@latest
+          runtime: node@lts
           cache: true
           install: false
       - name: Prepare version
