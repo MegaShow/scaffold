@@ -1,6 +1,6 @@
 {
   "name": "@icytown/scaffold-client",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "TypeScript HTTP client runtime for Scaffold generated services",
   "homepage": "https://github.com/megashow/scaffold",
   "repository": {
