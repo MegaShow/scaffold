@@ -1,0 +1,103 @@
+name: Release
+
+on:
+  workflow_run:
+    workflows: [Scaffold]
+    types: [completed]
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  detect-release:
+    # 只信任本仓库 master 推送对应的成功 CI，排除 PR 和 fork
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'master' &&
+      github.event.workflow_run.head_repository.id == github.event.repository.id
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.detect.outputs.version }}
+      channel: ${{ steps.detect.outputs.channel }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Setup pnpm
+        uses: pnpm/setup@v2
+        with:
+          runtime: node@latest
+          cache: true
+          install: false
+      - name: Detect release version
+        id: detect
+        # 对比发布 PR 合并提交的第一父提交，识别 npm 清单的版本变更
+        run: |
+          before=$(git rev-parse HEAD^1)
+          node scripts/release.mjs detect "$before"
+
+  build-release:
+    if: needs.detect-release.outputs.version != ''
+    needs: detect-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version: 'stable'
+      - uses: pnpm/setup@v2
+        with:
+          runtime: node@latest
+          cache: true
+          install: false
+      - name: Build and pack release artifacts
+        env:
+          VERSION: ${{ needs.detect-release.outputs.version }}
+        run: |
+          pnpm install --frozen-lockfile
+          bash scripts/build-release.sh "$VERSION" "$RUNNER_TEMP/scaffold-release"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: scaffold-release-${{ github.event.workflow_run.head_sha }}
+          path: ${{ runner.temp }}/scaffold-release
+          if-no-files-found: error
+          overwrite: true
+
+  publish-release:
+    if: needs.detect-release.outputs.version != ''
+    needs: [detect-release, build-release]
+    runs-on: ubuntu-latest
+    environment: Release
+    concurrency:
+      group: scaffold-publish-release
+      cancel-in-progress: false
+    # 发布任务直接使用原提交与已构建产物，无需等待 tag 触发另一个工作流
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - uses: pnpm/setup@v2
+        with:
+          runtime: node@latest
+          cache: true
+          install: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: scaffold-release-${{ github.event.workflow_run.head_sha }}
+          path: ${{ runner.temp }}/scaffold-release
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.detect-release.outputs.version }}
+          CHANNEL: ${{ needs.detect-release.outputs.channel }}
+        run: bash scripts/publish-release.sh "$VERSION" "$CHANNEL" "$RUNNER_TEMP/scaffold-release"

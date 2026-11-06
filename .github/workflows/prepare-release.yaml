@@ -1,0 +1,99 @@
+name: Prepare Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '精确版本（可选，例如 0.1.0 或 0.2.0-rc.1；填写后优先使用）'
+        type: string
+      release:
+        description: '版本递增方式（未填写精确版本时使用）'
+        required: true
+        type: choice
+        default: 'next — 正式版升补丁，预发布版递增序号'
+        options:
+          - 'next — 正式版升补丁，预发布版递增序号'
+          - 'patch — 补丁版本'
+          - 'minor — 次版本'
+          - 'major — 主版本'
+          - 'prepatch — 开始补丁预发布'
+          - 'preminor — 开始次版本预发布'
+          - 'premajor — 开始主版本预发布'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scaffold-prepare-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/setup@v2
+        with:
+          runtime: node@latest
+          cache: true
+          install: false
+      - name: Prepare version
+        id: prepare
+        env:
+          RELEASE_TYPE: ${{ inputs.release }}
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: node scripts/release.mjs prepare "$RELEASE_TYPE" "$RELEASE_VERSION"
+
+      # 内置令牌创建的 PR 需要在合并区域手动批准运行检查
+      - name: Open release pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.prepare.outputs.version }}
+        run: |
+          open_pr=$(gh pr list --base master --state open --limit 100 --json headRefName,url \
+            --jq '.[] | select(.headRefName | startswith("release/")) | .url')
+          if [[ -n "$open_pr" ]]; then
+            echo "A release pull request is already open: $open_pr" >&2
+            exit 1
+          fi
+
+          # 从准备版本时的提交生成摘要，排除下面新建的版本提交
+          base_sha=$(git rev-parse HEAD)
+          previous=$(git describe --tags --first-parent --abbrev=0 --always --match 'v[01].[0-9]*.[0-9]*' "$base_sha")
+          range="$base_sha"
+          if [[ "$previous" == v* ]]; then
+            range="$previous..$base_sha"
+          fi
+          repo_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"
+          body="$RUNNER_TEMP/scaffold-release-pr.md"
+          {
+            printf 'Prepare Scaffold v%s for release.\n\n' "$VERSION"
+            printf 'Requested by @%s · [Workflow run](%s/actions/runs/%s)\n\n' \
+              "$GITHUB_ACTOR" "$repo_url" "$GITHUB_RUN_ID"
+            printf '## Changes\n\n'
+            if [[ "$previous" == v* ]]; then
+              printf '[Compare with %s](%s/compare/%s...%s)\n\n' "$previous" "$repo_url" "$previous" "$base_sha"
+            else
+              printf 'First release · [Commit history](%s/commits/%s)\n\n' "$repo_url" "$base_sha"
+            fi
+            # 只展示主线最近的提交，完整历史通过上面的链接查看
+            changes=$(git log --first-parent -n 30 --format="- %s ([%h]($repo_url/commit/%H))" "$range")
+            printf '%s\n' "${changes:-- No new commits.}"
+          } > "$body"
+
+          # 每次尝试使用独立分支，建 PR 失败后可以重试且无需覆盖远端分支
+          branch="release/v$VERSION-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          git switch -c "$branch"
+          git add -- typescript/client/package.json
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "Release v$VERSION"
+          gh auth setup-git
+          git push origin "HEAD:refs/heads/$branch"
+          gh pr create --base master --head "$branch" --title "Release v$VERSION" --body-file "$body"

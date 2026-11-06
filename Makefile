@@ -1,5 +1,3 @@
-VERSION := 0.1.0
-
 BIN := $(CURDIR)/bin
 NODE_BIN = $(CURDIR)/node_modules/.bin
 

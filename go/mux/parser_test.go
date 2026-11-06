@@ -358,8 +358,14 @@ func TestMultipartParser_Parse(t *testing.T) {
 	})
 	t.Run("multipart_message_too_large", func(t *testing.T) {
 		t.Parallel()
-		r := newUploadRequest(t, 0)
-		err := (MultipartParser{MaxMemory: -(10 << 20)}).Parse(r, &uploadRequest{})
+		// 普通字段不能落盘，超过内存预算时触发 multipart.ErrMessageTooLarge
+		var body bytes.Buffer
+		writer := multipart.NewWriter(&body)
+		assert.Nil(t, writer.WriteField("name", strings.Repeat("x", 11<<20)))
+		assert.Nil(t, writer.Close())
+		r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/", &body)
+		r.Header.Set("Content-Type", writer.FormDataContentType())
+		err := (MultipartParser{MaxMemory: 1}).Parse(r, &uploadRequest{})
 		assert.Equal(t, error(errContentTooLarge), err)
 	})
 }
