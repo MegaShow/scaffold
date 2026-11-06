@@ -11,10 +11,11 @@ sha=$(git rev-parse HEAD)
 (cd "$artifacts/github" && sha256sum -c checksums.txt)
 integrity="sha512-$(openssl dgst -sha512 -binary "$tarball" | openssl base64 -A)"
 
+# 在客户端目录运行 npm，避免触发仓库根目录的 pnpm 开发工具约束
 # 只把不存在的版本视为待发布，认证或网络错误需要明确失败
 npm_view() {
   local result
-  if result=$(npm view --json "$@"); then
+  if result=$(cd typescript/client && npm view --json "$@"); then
     printf '%s' "$result"
   elif jq -e '.error.code == "E404"' <<< "$result" > /dev/null; then
     printf 'null'
@@ -61,7 +62,7 @@ done
 if ((${#missing[@]})); then git push --atomic origin "${missing[@]}"; fi
 
 if [[ -z "$published" ]]; then
-  npm publish "$tarball" --ignore-scripts --access public --tag "$channel"
+  (cd typescript/client && npm publish "$tarball" --ignore-scripts --access public --tag "$channel")
 fi
 
 # 先传附件再公开 Release，兼容启用了不可变发布的仓库

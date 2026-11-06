@@ -1,22 +1,13 @@
 name: Release
 
 on:
-  workflow_run:
-    workflows: [Scaffold]
-    types: [completed]
-    branches: [master]
+  workflow_call:
 
 permissions:
   contents: read
 
 jobs:
   detect-release:
-    # 只信任本仓库 master 推送对应的成功 CI，排除 PR 和 fork
-    if: >-
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.head_branch == 'master' &&
-      github.event.workflow_run.head_repository.id == github.event.repository.id
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.detect.outputs.version }}
@@ -24,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.sha }}
           fetch-depth: 2
           persist-credentials: false
       - name: Setup pnpm
@@ -47,7 +38,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.sha }}
           persist-credentials: false
       - uses: actions/setup-go@v7
         with:
@@ -65,7 +56,7 @@ jobs:
           bash scripts/build-release.sh "$VERSION" "$RUNNER_TEMP/scaffold-release"
       - uses: actions/upload-artifact@v4
         with:
-          name: scaffold-release-${{ github.event.workflow_run.head_sha }}
+          name: scaffold-release-${{ github.sha }}
           path: ${{ runner.temp }}/scaffold-release
           if-no-files-found: error
           overwrite: true
@@ -85,7 +76,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.sha }}
       - uses: pnpm/setup@v2
         with:
           runtime: node@latest
@@ -93,7 +84,7 @@ jobs:
           install: false
       - uses: actions/download-artifact@v4
         with:
-          name: scaffold-release-${{ github.event.workflow_run.head_sha }}
+          name: scaffold-release-${{ github.sha }}
           path: ${{ runner.temp }}/scaffold-release
       - name: Publish release
         env:
